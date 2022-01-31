@@ -62,6 +62,10 @@ export class SyncWsvStreamWriter {
 	private writer: SyncReliableTxtStreamWriter
 	private preserveWhitespacesAndComments: boolean
 
+	get encoding(): ReliableTxtEncoding {
+		return this.writer.encoding
+	}
+
 	constructor(filePath: string, createWithEncoding: ReliableTxtEncoding = ReliableTxtEncoding.Utf8, append: boolean = false, preserveWhitespacesAndComments: boolean = true) {
 		this.preserveWhitespacesAndComments = preserveWhitespacesAndComments
 		this.writer = new SyncReliableTxtStreamWriter(filePath, createWithEncoding, append)

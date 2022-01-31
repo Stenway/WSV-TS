@@ -19,30 +19,19 @@ export class WsvParserError extends Error {
 
 // ----------------------------------------------------------------------
 
-export class WsvLine {
-	values: (string | null)[]
-	
-	private _whitespaces: (string | null)[] | null = null
-	private _comment: string | null = null
-
-	get whitespaces(): (string | null)[] | null {
-		if (this._whitespaces === null) { return null }
-        return [...this._whitespaces]
-	}
-
-	set whitespaces(values: (string | null)[] | null) {
+export abstract class WsvStringUtil {
+	static validateWhitespaceStrings(values: (string | null)[] | null) {
 		if (values !== null) {
 			for (let i=0; i<values.length; i++) {
 				let wsValue: string | null = values[i]
 				if (wsValue === null) { continue }
-				WsvLine.validateWhitespaceString(wsValue)
+				WsvStringUtil.validateWhitespaceString(wsValue, i===0)
 			}
 		}
-		this._whitespaces = values
 	}
 
-	private static validateWhitespaceString(str: string) {
-		if (str.length === 0) { throw new TypeError("Whitespace string cannot be empty") }
+	static validateWhitespaceString(str: string, isFirst: boolean) {
+		if (str.length === 0 && !isFirst) { throw new TypeError("Non-first whitespace string cannot be empty") }
 		for (let i=0; i<str.length; i++) {
 			let codeUnit: number = str.charCodeAt(i)
 			switch (codeUnit) {
@@ -54,11 +43,7 @@ export class WsvLine {
 		}
 	}
 
-	get comment(): string | null {
-		return this._comment
-	}
-
-	set comment(value: string | null) {
+	static validateComment(value: string | null) {
 		if (value !== null) {
 			for (let i=0; i<value.length; i++) {
 				let codeUnit: number = value.charCodeAt(i)
@@ -71,6 +56,38 @@ export class WsvLine {
 				}
 			}
 		}
+	}
+}
+
+// ----------------------------------------------------------------------
+
+export class WsvLine {
+	values: (string | null)[]
+	
+	private _whitespaces: (string | null)[] | null = null
+	private _comment: string | null = null
+
+	get hasValues(): boolean {
+		return this.values.length > 0
+	}
+
+	get whitespaces(): (string | null)[] | null {
+		if (this._whitespaces === null) { return null }
+		return [...this._whitespaces]
+	}
+
+	set whitespaces(values: (string | null)[] | null) {
+		WsvStringUtil.validateWhitespaceStrings(values)
+		if (values !== null) { this._whitespaces = [...values] }
+		else { this._whitespaces = null}
+	}
+
+	get comment(): string | null {
+		return this._comment
+	}
+
+	set comment(value: string | null) {
+		WsvStringUtil.validateComment(value)
 		this._comment = value
 	}
 
@@ -78,13 +95,13 @@ export class WsvLine {
 		return this._comment !== null
 	}
 
-	constructor(values: (string | null)[], whitespaces: string[] | null = null, comment: string | null = null) {
+	constructor(values: (string | null)[], whitespaces: (string | null)[] | null = null, comment: string | null = null) {
 		this.values = values
 		this.whitespaces = whitespaces
 		this.comment = comment
 	}
 
-	set(values: (string | null)[], whitespaces: string[] | null = null, comment: string | null = null) {
+	set(values: (string | null)[], whitespaces: (string | null)[] | null = null, comment: string | null = null) {
 		this.values = values
 		this.whitespaces = whitespaces
 		this.comment = comment
@@ -92,10 +109,14 @@ export class WsvLine {
 	
 	toString(preserveWhitespaceAndComment: boolean = true): string {
 		if (preserveWhitespaceAndComment) {
-			return WsvSerializer.serializeLine(this)
+			return this.serialize()
 		} else {
 			return WsvSerializer.serializeValues(this.values)
 		}
+	}
+
+	serialize(): string {
+		return WsvSerializer.serializeValuesWhitespacesAndComment(this.values, this._whitespaces, this._comment)
 	}
 	
 	static internal(values: (string | null)[], whitespaces: (string | null)[] | null = null, comment: string | null = null): WsvLine {
@@ -103,6 +124,10 @@ export class WsvLine {
 		line._whitespaces = whitespaces
 		line._comment = comment
 		return line
+	}
+
+	static internalWhitespaces(line: WsvLine): (string | null)[] | null {
+		return line._whitespaces
 	}
 
 	static parse(str: string, preserveWhitespacesAndComments: boolean = true) {
@@ -158,19 +183,15 @@ export class WsvDocument {
 	}
 
 	static parseAsJaggedArray(str: string): (string | null)[][] {
-		return WsvDocument.parse(str, false).toJaggedArray()
+		return WsvParser.parseAsJaggedArray(str)
 	}
 }
 
 // ----------------------------------------------------------------------
 
 export abstract class WsvSerializer {
-	private static needsDoubleQuotes(value: string): boolean {
-		if (value === null) { return false }
-		else if (value.length === 0 || value === "-") { return true }
-		return WsvSerializer.containsSpecialChar(value)
-	}
-	
+	private static readonly stringNotClosed: string			= "String not closed"
+
 	private static containsSpecialChar(value: string): boolean {
 		for (let i=0; i<value.length; i++) {
 			let c: number = value.charCodeAt(i)
@@ -256,29 +277,29 @@ export abstract class WsvSerializer {
 		return strings.join("")
 	}
 
-	static serializeArrayOfValues(arrayOfValues: (string | null)[][]): string {
+	static serializeJaggedArray(jaggedArray: (string | null)[][]): string {
 		let lines: string[] = []
-		for (let values of arrayOfValues) {
+		for (let values of jaggedArray) {
 			let line: string = WsvSerializer.serializeValues(values)
 			lines.push(line)
 		}
 		return ReliableTxtLines.join(lines)
 	}
 
-	static serializeLine(line: WsvLine): string {
+	static serializeValuesWhitespacesAndComment(values: (string | null)[], whitespaces: (string | null)[] | null = null, comment: string | null = null): string {
 		let strings: string[] = []
-		let whitespaces: (string | null)[] = line.whitespaces ?? []
-		for (let i=0; i<line.values.length; i++) {
+		whitespaces ??= []
+		for (let i=0; i<values.length; i++) {
 			let whitespace: string | null = i < whitespaces.length ? whitespaces[i] : null
 			whitespace ??= i !== 0 ? " " : ""
 			strings.push(whitespace)
-			let serialized: string = WsvSerializer.serializeValue(line.values[i])
+			let serialized: string = WsvSerializer.serializeValue(values[i])
 			strings.push(serialized)
 		}
-		if (whitespaces.length > line.values.length) { strings.push(whitespaces[line.values.length] ?? "")}
-		else if (line.hasComment && line.values.length > 0 && whitespaces.length === 0) { strings.push(" ") }
+		if (whitespaces.length > values.length) { strings.push(whitespaces[values.length] ?? "")}
+		else if (comment !== null && values.length > 0 && whitespaces.length === 0) { strings.push(" ") }
 
-		if (line.hasComment) { strings.push("#"+line.comment) }
+		if (comment !== null) { strings.push("#"+comment) }
 		return strings.join("")
 	}
 
@@ -294,6 +315,11 @@ export abstract class WsvSerializer {
 // ----------------------------------------------------------------------
 
 export abstract class WsvParser {
+	private static readonly stringNotClosed: string					= "String not closed"
+	private static readonly invalidStringLineBreak: string			= "Invalid string line break"
+	private static readonly invalidCharacterAfterString: string		= "Invalid character after string"
+	private static readonly invalidDoubleQuoteInValue: string		= "Invalid double quote in value"
+
 	static parseLine(str: string, preserveWhitespacesAndComments: boolean, lineIndexOffset: number = 0): WsvLine {
 		let lines: WsvLine[]
 		lines = WsvParser.parseLines(str, preserveWhitespacesAndComments, lineIndexOffset)
@@ -394,12 +420,12 @@ export abstract class WsvParser {
 					index++
 					let strCodeUnits: string[] = []
 					stringCharLoop: while (true) {
-						if (index >= str.length) { throw WsvParser.getError("String not closed", lineIndex, lineStartIndex, index) }
+						if (index >= str.length) { throw WsvParser.getError(WsvParser.stringNotClosed, lineIndex, lineStartIndex, index) }
 						codeUnit = str.charCodeAt(index)
 						index++
 						switch (codeUnit) {
 							case 0x000A:
-								throw WsvParser.getError("String not closed", lineIndex, lineStartIndex, index)
+								throw WsvParser.getError(WsvParser.stringNotClosed, lineIndex, lineStartIndex, index-1)
 							case 0x0022:
 								if (index >= str.length) { break stringCharLoop }
 								codeUnit = str.charCodeAt(index)
@@ -414,14 +440,14 @@ export abstract class WsvParser {
 										break stringCharLoop
 									case 0x002F:
 										index++
-										if (index >= str.length) { throw WsvParser.getError("Invalid string line break", lineIndex, lineStartIndex, index) }
+										if (index >= str.length) { throw WsvParser.getError(WsvParser.invalidStringLineBreak, lineIndex, lineStartIndex, index) }
 										codeUnit = str.charCodeAt(index)
-										if (codeUnit !== 0x0022) { throw WsvParser.getError("Invalid string line break", lineIndex, lineStartIndex, index) }
+										if (codeUnit !== 0x0022) { throw WsvParser.getError(WsvParser.invalidStringLineBreak, lineIndex, lineStartIndex, index) }
 										strCodeUnits.push("\n")
 										index++
 										break
 									default:
-										throw WsvParser.getError("Invalid character after string", lineIndex, lineStartIndex, index)
+										throw WsvParser.getError(WsvParser.invalidCharacterAfterString, lineIndex, lineStartIndex, index)
 								}
 								break
 							default:
@@ -446,7 +472,7 @@ export abstract class WsvParser {
 							case 0x0009: case 0x000B: case 0x000C: case 0x000D: case 0x0020: case 0x0085: case 0x00A0: case 0x1680: case 0x2000: case 0x2001: case 0x2002: case 0x2003: case 0x2004: case 0x2005: case 0x2006: case 0x2007: case 0x2008: case 0x2009: case 0x200A: case 0x2028: case 0x2029: case 0x202F: case 0x205F: case 0x3000:
 								break valueCharLoop
 							case 0x0022:
-								throw WsvParser.getError("Invalid double quote in value", lineIndex, lineStartIndex, index)
+								throw WsvParser.getError(WsvParser.invalidDoubleQuoteInValue, lineIndex, lineStartIndex, index)
 						}
 						if (codeUnit >= 0xD800 && codeUnit <= 0xDFFF) {
 							index++
@@ -539,12 +565,12 @@ export abstract class WsvParser {
 					index++
 					let strCodeUnits: string[] = []
 					stringCharLoop: while (true) {
-						if (index >= str.length) { throw WsvParser.getError("String not closed", lineIndex, lineStartIndex, index) }
+						if (index >= str.length) { throw WsvParser.getError(WsvParser.stringNotClosed, lineIndex, lineStartIndex, index) }
 						codeUnit = str.charCodeAt(index)
 						index++
 						switch (codeUnit) {
 							case 0x000A:
-								throw WsvParser.getError("String not closed", lineIndex, lineStartIndex, index)
+								throw WsvParser.getError(WsvParser.stringNotClosed, lineIndex, lineStartIndex, index-1)
 							case 0x0022:
 								if (index >= str.length) { break stringCharLoop }
 								codeUnit = str.charCodeAt(index)
@@ -559,14 +585,14 @@ export abstract class WsvParser {
 										break stringCharLoop
 									case 0x002F:
 										index++
-										if (index >= str.length) { throw WsvParser.getError("Invalid string line break", lineIndex, lineStartIndex, index) }
+										if (index >= str.length) { throw WsvParser.getError(WsvParser.invalidStringLineBreak, lineIndex, lineStartIndex, index) }
 										codeUnit = str.charCodeAt(index)
-										if (codeUnit !== 0x0022) { throw WsvParser.getError("Invalid string line break", lineIndex, lineStartIndex, index) }
+										if (codeUnit !== 0x0022) { throw WsvParser.getError(WsvParser.invalidStringLineBreak, lineIndex, lineStartIndex, index) }
 										strCodeUnits.push("\n")
 										index++
 										break
 									default:
-										throw WsvParser.getError("Invalid character after string", lineIndex, lineStartIndex, index)
+										throw WsvParser.getError(WsvParser.invalidCharacterAfterString, lineIndex, lineStartIndex, index)
 								}
 								break
 							default:
@@ -591,7 +617,152 @@ export abstract class WsvParser {
 							case 0x0009: case 0x000B: case 0x000C: case 0x000D: case 0x0020: case 0x0085: case 0x00A0: case 0x1680: case 0x2000: case 0x2001: case 0x2002: case 0x2003: case 0x2004: case 0x2005: case 0x2006: case 0x2007: case 0x2008: case 0x2009: case 0x200A: case 0x2028: case 0x2029: case 0x202F: case 0x205F: case 0x3000:
 								break valueCharLoop
 							case 0x0022:
-								throw WsvParser.getError("Invalid double quote in value", lineIndex, lineStartIndex, index)
+								throw WsvParser.getError(WsvParser.invalidDoubleQuoteInValue, lineIndex, lineStartIndex, index)
+						}
+						if (codeUnit >= 0xD800 && codeUnit <= 0xDFFF) {
+							index++
+							if (codeUnit >= 0xDC00 || index >= str.length) { throw new InvalidUtf16StringError() }
+							let secondCodeUnit: number = str.charCodeAt(index)
+							if (!(secondCodeUnit >= 0xDC00 && secondCodeUnit <= 0xDFFF)) { throw new InvalidUtf16StringError() }
+						}
+						index++
+						if (index >= str.length) { break valueCharLoop }
+						codeUnit = str.charCodeAt(index)
+					}
+					let value: string | null = str.substring(startIndex, index)
+					if (value.length === 1 && value.charCodeAt(0) === 0x002D) { value = null }
+					values.push(value)
+				}
+			}
+		}
+		return lines
+	}
+
+	static parseAsJaggedArray(str: string, lineIndexOffset: number = 0): (string | null)[][] {
+		let lines: (string | null)[][] = []
+		let index: number = 0
+		let startIndex: number = 0
+		
+		let values: (string | null)[]
+		
+		let codeUnit: number
+		let lineIndex: number = lineIndexOffset - 1
+		let lineStartIndex: number
+		lineLoop: while (true) {
+			lineIndex++
+			lineStartIndex = index
+
+			values = []
+			valueLoop: while (true) {
+				if (index >= str.length) {
+					lines.push(values)
+					break lineLoop
+				}
+				codeUnit = str.charCodeAt(index)
+				startIndex = index
+				wsLoop: while (true) {
+					switch (codeUnit) {
+						case 0x0009: case 0x000B: case 0x000C: case 0x000D: case 0x0020: case 0x0085: case 0x00A0: case 0x1680: case 0x2000: case 0x2001: case 0x2002: case 0x2003: case 0x2004: case 0x2005: case 0x2006: case 0x2007: case 0x2008: case 0x2009: case 0x200A: case 0x2028: case 0x2029: case 0x202F: case 0x205F: case 0x3000:
+							index++
+							if (index >= str.length) { break wsLoop }
+							codeUnit = str.charCodeAt(index)
+							break
+						default:
+							break wsLoop
+					}
+				}
+				if (index > startIndex) {
+					if (index >= str.length) {
+						lines.push(values)
+						break lineLoop
+					}
+					startIndex = index
+				}
+				switch (codeUnit) {
+					case 0x000A:
+						lines.push(values)
+						index++
+						continue lineLoop
+					case 0x0023:
+						index++
+						startIndex = index
+						let wasLineBreak: boolean = false
+						commentLoop: while (true) {
+							if (index >= str.length) { break commentLoop }
+							codeUnit = str.charCodeAt(index)
+							index++
+							if (codeUnit === 0x000A) {
+								wasLineBreak = true
+								break commentLoop
+							} else if (codeUnit >= 0xD800 && codeUnit <= 0xDFFF) {
+								if (codeUnit >= 0xDC00 || index >= str.length) { throw new InvalidUtf16StringError() }
+								let secondCodeUnit: number = str.charCodeAt(index)
+								if (!(secondCodeUnit >= 0xDC00 && secondCodeUnit <= 0xDFFF)) { throw new InvalidUtf16StringError() }
+								index++
+							}
+						}
+						lines.push(values)
+						if (index >= str.length && !wasLineBreak) { break lineLoop }
+						else { continue lineLoop }
+				}
+
+				if (codeUnit === 0x0022) {
+					index++
+					let strCodeUnits: string[] = []
+					stringCharLoop: while (true) {
+						if (index >= str.length) { throw WsvParser.getError(WsvParser.stringNotClosed, lineIndex, lineStartIndex, index) }
+						codeUnit = str.charCodeAt(index)
+						index++
+						switch (codeUnit) {
+							case 0x000A:
+								throw WsvParser.getError(WsvParser.stringNotClosed, lineIndex, lineStartIndex, index-1)
+							case 0x0022:
+								if (index >= str.length) { break stringCharLoop }
+								codeUnit = str.charCodeAt(index)
+								switch (codeUnit) {
+									case 0x0022:
+										strCodeUnits.push("\"")
+										index++
+										break
+									case 0x000A:
+									case 0x0023:
+									case 0x0009: case 0x000B: case 0x000C: case 0x000D: case 0x0020: case 0x0085: case 0x00A0: case 0x1680: case 0x2000: case 0x2001: case 0x2002: case 0x2003: case 0x2004: case 0x2005: case 0x2006: case 0x2007: case 0x2008: case 0x2009: case 0x200A: case 0x2028: case 0x2029: case 0x202F: case 0x205F: case 0x3000:
+										break stringCharLoop
+									case 0x002F:
+										index++
+										if (index >= str.length) { throw WsvParser.getError(WsvParser.invalidStringLineBreak, lineIndex, lineStartIndex, index) }
+										codeUnit = str.charCodeAt(index)
+										if (codeUnit !== 0x0022) { throw WsvParser.getError(WsvParser.invalidStringLineBreak, lineIndex, lineStartIndex, index) }
+										strCodeUnits.push("\n")
+										index++
+										break
+									default:
+										throw WsvParser.getError(WsvParser.invalidCharacterAfterString, lineIndex, lineStartIndex, index)
+								}
+								break
+							default:
+								strCodeUnits.push(String.fromCharCode(codeUnit))
+								if (codeUnit >= 0xD800 && codeUnit <= 0xDFFF) {
+									index++
+									if (codeUnit >= 0xDC00 || index >= str.length) { throw new InvalidUtf16StringError() }
+									let secondCodeUnit: number = str.charCodeAt(index)
+									if (!(secondCodeUnit >= 0xDC00 && secondCodeUnit <= 0xDFFF)) { throw new InvalidUtf16StringError() }
+									strCodeUnits.push(String.fromCharCode(secondCodeUnit))
+									index++
+								}
+								break
+						}
+					}
+					values.push(strCodeUnits.join(""))
+				} else {
+					valueCharLoop: while (true) {
+						switch (codeUnit) {
+							case 0x000A:
+							case 0x0023:
+							case 0x0009: case 0x000B: case 0x000C: case 0x000D: case 0x0020: case 0x0085: case 0x00A0: case 0x1680: case 0x2000: case 0x2001: case 0x2002: case 0x2003: case 0x2004: case 0x2005: case 0x2006: case 0x2007: case 0x2008: case 0x2009: case 0x200A: case 0x2028: case 0x2029: case 0x202F: case 0x205F: case 0x3000:
+								break valueCharLoop
+							case 0x0022:
+								throw WsvParser.getError(WsvParser.invalidDoubleQuoteInValue, lineIndex, lineStartIndex, index)
 						}
 						if (codeUnit >= 0xD800 && codeUnit <= 0xDFFF) {
 							index++
