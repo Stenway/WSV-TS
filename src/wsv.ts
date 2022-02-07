@@ -296,7 +296,7 @@ export abstract class WsvSerializer {
 			let serialized: string = WsvSerializer.serializeValue(values[i])
 			strings.push(serialized)
 		}
-		if (whitespaces.length > values.length) { strings.push(whitespaces[values.length] ?? "")}
+		if (whitespaces.length > values.length) { strings.push(whitespaces[values.length] ?? "") }
 		else if (comment !== null && values.length > 0 && whitespaces.length === 0) { strings.push(" ") }
 
 		if (comment !== null) { strings.push("#"+comment) }
