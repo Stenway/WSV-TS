@@ -1,6 +1,6 @@
 ﻿/* (C) Stefan John / Stenway / WhitespaceSV.com / 2022 */
 
-import { InvalidUtf16StringError, ReliableTxtDocument, ReliableTxtEncoding, ReliableTxtLines, Utf16String } from "./reliabletxt.js"
+import { InvalidUtf16StringError, ReliableTxtDocument, ReliableTxtEncoding, ReliableTxtLines, Utf16String } from "@stenway/reliabletxt"
 
 // ----------------------------------------------------------------------
 

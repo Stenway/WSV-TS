@@ -1,0 +1,37 @@
+{
+  "name": "@stenway/wsv",
+  "version": "0.0.2",
+  "description": "Stefan John / Stenway / WhitespaceSV.com / 2022",
+  "homepage": "https://www.whitespacesv.com",
+  "repository": "github:Stenway/WSV-TS",
+  "bugs": {
+    "url": "https://github.com/Stenway/WSV-TS/issues"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "/dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": [
+    "csv",
+    "wsv",
+    "comma separated values",
+    "delimiter",
+    "tsv",
+    "whitespace",
+    "unicode",
+    "utf-8",
+    "reliabletxt"
+  ],
+  "author": "Stefan John",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^4.8.4"
+  },
+  "dependencies": {
+    "@stenway/reliabletxt": "^0.0.2"
+  }
+}
