@@ -23,8 +23,7 @@ export declare class WsvLine {
     constructor(values: (string | null)[], whitespaces?: (string | null)[] | null, comment?: string | null);
     set(values: (string | null)[], whitespaces?: (string | null)[] | null, comment?: string | null): void;
     toString(preserveWhitespaceAndComment?: boolean): string;
-    serialize(): string;
-    static internal(values: (string | null)[], whitespaces?: (string | null)[] | null, comment?: string | null): WsvLine;
+    static internal(values: (string | null)[], whitespaces: (string | null)[] | null, comment: string | null): WsvLine;
     static internalWhitespaces(line: WsvLine): (string | null)[] | null;
     static parse(str: string, preserveWhitespacesAndComments?: boolean): WsvLine;
     static parseAsArray(str: string): (string | null)[];
@@ -34,20 +33,26 @@ export declare class WsvDocument {
     lines: WsvLine[];
     encoding: ReliableTxtEncoding;
     constructor(lines?: WsvLine[], encoding?: ReliableTxtEncoding);
-    addLine(values: (string | null)[], whitespaces?: string[] | null, comment?: string | null): void;
+    addLine(values: (string | null)[], whitespaces?: (string | null)[] | null, comment?: string | null): void;
     toJaggedArray(): (string | null)[][];
     toString(preserveWhitespaceAndComment?: boolean): string;
     getBytes(preserveWhitespacesAndComments?: boolean): Uint8Array;
     static parse(str: string, preserveWhitespacesAndComments?: boolean): WsvDocument;
     static parseAsJaggedArray(str: string): (string | null)[][];
+    static fromJaggedArray(jaggedArray: (string | null)[][], encoding?: ReliableTxtEncoding): WsvDocument;
+    static fromBytes(bytes: Uint8Array): WsvDocument;
+    static fromLines(lines: string[], preserveWhitespacesAndComments?: boolean, encoding?: ReliableTxtEncoding): WsvDocument;
+}
+export declare abstract class WsvValue {
+    private static containsSpecialChar;
+    static isSpecial(value: string | null): boolean;
+    static serialize(value: string | null): string;
+    static parse(str: string, allowWhitespaceAndComment?: boolean): string | null;
 }
 export declare abstract class WsvSerializer {
-    private static readonly stringNotClosed;
-    private static containsSpecialChar;
-    static serializeValue(value: string | null): string;
     static serializeValues(values: (string | null)[]): string;
     static serializeJaggedArray(jaggedArray: (string | null)[][]): string;
-    static serializeValuesWhitespacesAndComment(values: (string | null)[], whitespaces?: (string | null)[] | null, comment?: string | null): string;
+    static internalSerializeValuesWhitespacesAndComment(values: (string | null)[], whitespaces: (string | null)[] | null, comment: string | null): string;
     static serializeLines(lines: WsvLine[], preserveWhitespaceAndComment?: boolean): string;
 }
 export declare abstract class WsvParser {
@@ -62,3 +67,4 @@ export declare abstract class WsvParser {
     private static parseLinesNonPreserving;
     static parseAsJaggedArray(str: string, lineIndexOffset?: number): (string | null)[][];
 }
+//# sourceMappingURL=wsv.d.ts.map
