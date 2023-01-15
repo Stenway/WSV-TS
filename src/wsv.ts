@@ -1,6 +1,6 @@
 ﻿/* (C) Stefan John / Stenway / WhitespaceSV.com / 2023 */
 
-import { InvalidUtf16StringError, ReliableTxtDocument, ReliableTxtEncoding, ReliableTxtLines, Utf16String } from "@stenway/reliabletxt"
+import { Base64String, InvalidUtf16StringError, ReliableTxtDocument, ReliableTxtEncoding, ReliableTxtLines, Utf16String } from "@stenway/reliabletxt"
 
 // ----------------------------------------------------------------------
 
@@ -172,10 +172,14 @@ export class WsvDocument {
 		return new ReliableTxtDocument(str, this.encoding).getBytes()
 	}
 
-	static parse(str: string, preserveWhitespacesAndComments: boolean = true) {
-		const document: WsvDocument = new WsvDocument()
-		document.lines = WsvParser.parseLines(str, preserveWhitespacesAndComments)
-		return document
+	toBase64String(preserveWhitespacesAndComments: boolean = true): string {
+		const str: string = this.toString(preserveWhitespacesAndComments)
+		return Base64String.fromText(str, this.encoding)
+	}
+
+	static parse(str: string, preserveWhitespacesAndComments: boolean = true, encoding: ReliableTxtEncoding = ReliableTxtEncoding.Utf8) {
+		const lines = WsvParser.parseLines(str, preserveWhitespacesAndComments)
+		return new WsvDocument(lines, encoding)
 	}
 
 	static parseAsJaggedArray(str: string): (string | null)[][] {
@@ -191,18 +195,21 @@ export class WsvDocument {
 		return document
 	}
 
-	static fromBytes(bytes: Uint8Array): WsvDocument {
+	static fromBytes(bytes: Uint8Array, preserveWhitespacesAndComments: boolean = true): WsvDocument {
 		const txtDocument = ReliableTxtDocument.fromBytes(bytes)
-		const document = WsvDocument.parse(txtDocument.text)
-		document.encoding = txtDocument.encoding
+		const document = WsvDocument.parse(txtDocument.text, preserveWhitespacesAndComments, txtDocument.encoding)
 		return document
 	}
 
 	static fromLines(lines: string[], preserveWhitespacesAndComments: boolean = true, encoding: ReliableTxtEncoding = ReliableTxtEncoding.Utf8) {
 		const content = ReliableTxtLines.join(lines)
-		const document = WsvDocument.parse(content, preserveWhitespacesAndComments)
-		document.encoding = encoding
+		const document = WsvDocument.parse(content, preserveWhitespacesAndComments, encoding)
 		return document
+	}
+
+	static fromBase64String(base64Str: string): WsvDocument {
+		const bytes = Base64String.toBytes(base64Str)
+		return this.fromBytes(bytes)
 	}
 }
 

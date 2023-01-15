@@ -179,10 +179,13 @@ class WsvDocument {
         const str = this.toString(preserveWhitespacesAndComments);
         return new reliabletxt_1.ReliableTxtDocument(str, this.encoding).getBytes();
     }
-    static parse(str, preserveWhitespacesAndComments = true) {
-        const document = new WsvDocument();
-        document.lines = WsvParser.parseLines(str, preserveWhitespacesAndComments);
-        return document;
+    toBase64String(preserveWhitespacesAndComments = true) {
+        const str = this.toString(preserveWhitespacesAndComments);
+        return reliabletxt_1.Base64String.fromText(str, this.encoding);
+    }
+    static parse(str, preserveWhitespacesAndComments = true, encoding = reliabletxt_1.ReliableTxtEncoding.Utf8) {
+        const lines = WsvParser.parseLines(str, preserveWhitespacesAndComments);
+        return new WsvDocument(lines, encoding);
     }
     static parseAsJaggedArray(str) {
         return WsvParser.parseAsJaggedArray(str);
@@ -195,17 +198,19 @@ class WsvDocument {
         document.encoding = encoding;
         return document;
     }
-    static fromBytes(bytes) {
+    static fromBytes(bytes, preserveWhitespacesAndComments = true) {
         const txtDocument = reliabletxt_1.ReliableTxtDocument.fromBytes(bytes);
-        const document = WsvDocument.parse(txtDocument.text);
-        document.encoding = txtDocument.encoding;
+        const document = WsvDocument.parse(txtDocument.text, preserveWhitespacesAndComments, txtDocument.encoding);
         return document;
     }
     static fromLines(lines, preserveWhitespacesAndComments = true, encoding = reliabletxt_1.ReliableTxtEncoding.Utf8) {
         const content = reliabletxt_1.ReliableTxtLines.join(lines);
-        const document = WsvDocument.parse(content, preserveWhitespacesAndComments);
-        document.encoding = encoding;
+        const document = WsvDocument.parse(content, preserveWhitespacesAndComments, encoding);
         return document;
+    }
+    static fromBase64String(base64Str) {
+        const bytes = reliabletxt_1.Base64String.toBytes(base64Str);
+        return this.fromBytes(bytes);
     }
 }
 exports.WsvDocument = WsvDocument;

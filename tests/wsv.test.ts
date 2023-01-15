@@ -809,6 +809,7 @@ describe("WsvDocument.parse", () => {
 		[`""""\n`, false, `""""\n`, `""""\n`],
 		[`""/""\n`, false, `""/""\n`, `""/""\n`],
 		[`" \t"\n`, false, `" \t"\n`, `" \t"\n`],
+		[" a \n\n \n b ", true, " a \n\n \n b ", "a\n\n\nb"],
 	])(
 		"Given %p and %p returns %p and %p",
 		(input, preserve, output1, output2) => {
@@ -916,6 +917,47 @@ describe("WsvDocument.fromBytes", () => {
 test("WsvDocument.fromLines", () => {
 	const document = WsvDocument.fromLines(["a b", "c d #comment"])
 	expect(document.toString()).toEqual("a b\nc d #comment")
+})
+
+describe("WsvDocument.toBase64String", () => {
+	test.each([
+		["", ReliableTxtEncoding.Utf8, "Base64|77u/|"],
+		["a b #c\n d", ReliableTxtEncoding.Utf8, "Base64|77u/YSBiICNjCiBk|"],
+		["a b #c\n d", ReliableTxtEncoding.Utf16, "Base64|/v8AYQAgAGIAIAAjAGMACgAgAGQ=|"],
+	])(
+		"Given %j and %p returns %p",
+		(input1, input2, output) => {
+			const document = WsvDocument.parse(input1, true, input2)
+			expect(document.toBase64String()).toEqual(output)
+		}
+	)
+})
+
+describe("WsvDocument.fromBase64String", () => {
+	test.each([
+		["Base64|77u/|", "", ReliableTxtEncoding.Utf8],
+		["Base64|77u/YSBiICNjCiBk|", "a b #c\n d", ReliableTxtEncoding.Utf8],
+		["Base64|/v8AYQAgAGIAIAAjAGMACgAgAGQ=|", "a b #c\n d", ReliableTxtEncoding.Utf16],
+	])(
+		"Given %p returns %j and %p",
+		(input, output1, output2) => {
+			const fromDocument = WsvDocument.fromBase64String(input)
+			expect(fromDocument.toString()).toEqual(output1)
+			expect(fromDocument.encoding).toEqual(output2)
+		}
+	)
+
+	test.each([
+		["Base64||"],
+		["Base64|TWFu|"],
+		["BASE64|77u/TWFu|"],
+		["77u/TWFu"],
+	])(
+		"Given %p throws",
+		(input) => {
+			expect(() => WsvDocument.fromBase64String(input)).toThrow()
+		}
+	)
 })
 
 // ----------------------------------------------------------------------

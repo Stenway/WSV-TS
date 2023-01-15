@@ -37,11 +37,13 @@ export declare class WsvDocument {
     toJaggedArray(): (string | null)[][];
     toString(preserveWhitespaceAndComment?: boolean): string;
     getBytes(preserveWhitespacesAndComments?: boolean): Uint8Array;
-    static parse(str: string, preserveWhitespacesAndComments?: boolean): WsvDocument;
+    toBase64String(preserveWhitespacesAndComments?: boolean): string;
+    static parse(str: string, preserveWhitespacesAndComments?: boolean, encoding?: ReliableTxtEncoding): WsvDocument;
     static parseAsJaggedArray(str: string): (string | null)[][];
     static fromJaggedArray(jaggedArray: (string | null)[][], encoding?: ReliableTxtEncoding): WsvDocument;
-    static fromBytes(bytes: Uint8Array): WsvDocument;
+    static fromBytes(bytes: Uint8Array, preserveWhitespacesAndComments?: boolean): WsvDocument;
     static fromLines(lines: string[], preserveWhitespacesAndComments?: boolean, encoding?: ReliableTxtEncoding): WsvDocument;
+    static fromBase64String(base64Str: string): WsvDocument;
 }
 export declare abstract class WsvValue {
     private static containsSpecialChar;
