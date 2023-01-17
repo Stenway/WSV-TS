@@ -27,20 +27,17 @@ For file reading and writing functionality see the [wsv-io package](https://www.
 
 ## Examples
 
+WSV line creation:
 ```ts
-import { ReliableTxtEncoding } from "@stenway/reliabletxt"
-import { WsvDocument, WsvLine, WsvParser, WsvParserError, WsvSerializer, WsvStringUtil } from "@stenway/wsv"
-
-// WSV line creation
-
 let line = new WsvLine(["Value1", "Value2"])
 let lineStr = line.toString()
 
 let lineWithComment = new WsvLine(["Value1", "Value2"], ["\t", "  ", " "], "My comment")
 let lineWithCommentStr = lineWithComment.toString()
+```
 
-// WSV line modification
-
+WSV line modification:
+```ts
 let values = lineWithComment.values
 let whitespaces = lineWithComment.whitespaces
 let comment = lineWithComment.comment
@@ -48,9 +45,10 @@ let comment = lineWithComment.comment
 lineWithComment.values[0] = "ChangedValue1"
 lineWithComment.comment = "Changed comment"
 let changedLineStr = lineWithComment.toString()
+```
 
-// special values
-
+Special values:
+```ts
 let normalValue = "Value"
 let valueWithSpace = "With space"
 let valueWithLineBreak = "With\nline break"
@@ -59,9 +57,10 @@ let valueWithDoublequotes = `With "Doublequotes"`
 let minusCharValue = "-"
 let specialValuesLine = new WsvLine([normalValue, valueWithSpace, valueWithLineBreak, nullValue, valueWithDoublequotes, minusCharValue])
 let specialValuesLineStr = specialValuesLine.toString()
+```
 
-// WSV line parsing
-
+WSV line parsing:
+```ts
 let parsedLine = WsvLine.parse(lineStr)
 let parsedLineStr = parsedLine.toString()
 
@@ -70,27 +69,30 @@ let parsedLineWithCommentStr = parsedLineWithComment.toString()
 
 let parsedLineWithoutWsAndComment = WsvLine.parse(lineWithCommentStr, false)
 let parsedLineWithoutWsAndCommentStr = parsedLineWithoutWsAndComment.toString()
+```
 
-// WSV line values
-
+WSV line values:
+```ts
 let emptyArray = WsvLine.parseAsArray("")
 let alsoEmpty = WsvLine.parseAsArray("     ")
 let valueArray = WsvLine.parseAsArray("Value1 Value2 - \"Value 4\"")
 
 let emptyArrayStr = WsvLine.serialize(emptyArray)
 let valueArrayStr = WsvLine.serialize(valueArray)
+```
 
-// parser error
-
+Parser error:
+```ts
 try {
 	WsvLine.parse(`Value1 "Val`)
 } catch(error) {
 	let parserError = error as WsvParserError
 	console.log(`Parser error: ${parserError.message}`)
 }
+```
 
-// WSV document
-
+WSV document:
+```ts
 let document = new WsvDocument()
 document.addLine(["Value1_1", "Value1_2"])
 document.addLine(["Value2_1", null], ["\t", "  ", " "], "My comment")
@@ -104,9 +106,10 @@ let anotherDocumentStr = anotherDocument.toString()
 let lines = anotherDocument.lines
 let encoding = anotherDocument.encoding
 let bytes = anotherDocument.getBytes()
+```
 
-// WSV document parsing
-
+WSV document parsing:
+```ts
 let content = `a b # My first line
                c d`
 
@@ -115,10 +118,9 @@ let parsedDocumentStr = parsedDocument.toString()
 
 let parsedDocumentWithoutWsAndComment = WsvDocument.parse(content, false)
 let parsedDocumentWithoutWsAndCommentStr = parsedDocumentWithoutWsAndComment.toString()
+```
 
-// jagged array
-
+Jagged array:
+```ts
 let jaggedArray = WsvDocument.parseAsJaggedArray(`a b c d\ne\nf g - i j k`)
-
-console.log("WSV usage")
 ```
