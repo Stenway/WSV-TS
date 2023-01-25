@@ -773,7 +773,7 @@ describe("WsvDocument.toBase64String", () => {
     test.each([
         ["", reliabletxt_1.ReliableTxtEncoding.Utf8, "Base64|77u/|"],
         ["a b #c\n d", reliabletxt_1.ReliableTxtEncoding.Utf8, "Base64|77u/YSBiICNjCiBk|"],
-        ["a b #c\n d", reliabletxt_1.ReliableTxtEncoding.Utf16, "Base64|/v8AYQAgAGIAIAAjAGMACgAgAGQ=|"],
+        ["a b #c\n d", reliabletxt_1.ReliableTxtEncoding.Utf16, "Base64|/v8AYQAgAGIAIAAjAGMACgAgAGQ|"],
     ])("Given %j and %p returns %p", (input1, input2, output) => {
         const document = src_1.WsvDocument.parse(input1, true, input2);
         expect(document.toBase64String()).toEqual(output);
@@ -783,7 +783,7 @@ describe("WsvDocument.fromBase64String", () => {
     test.each([
         ["Base64|77u/|", "", reliabletxt_1.ReliableTxtEncoding.Utf8],
         ["Base64|77u/YSBiICNjCiBk|", "a b #c\n d", reliabletxt_1.ReliableTxtEncoding.Utf8],
-        ["Base64|/v8AYQAgAGIAIAAjAGMACgAgAGQ=|", "a b #c\n d", reliabletxt_1.ReliableTxtEncoding.Utf16],
+        ["Base64|/v8AYQAgAGIAIAAjAGMACgAgAGQ|", "a b #c\n d", reliabletxt_1.ReliableTxtEncoding.Utf16],
     ])("Given %p returns %j and %p", (input, output1, output2) => {
         const fromDocument = src_1.WsvDocument.fromBase64String(input);
         expect(fromDocument.toString()).toEqual(output1);

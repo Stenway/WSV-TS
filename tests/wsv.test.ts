@@ -923,7 +923,7 @@ describe("WsvDocument.toBase64String", () => {
 	test.each([
 		["", ReliableTxtEncoding.Utf8, "Base64|77u/|"],
 		["a b #c\n d", ReliableTxtEncoding.Utf8, "Base64|77u/YSBiICNjCiBk|"],
-		["a b #c\n d", ReliableTxtEncoding.Utf16, "Base64|/v8AYQAgAGIAIAAjAGMACgAgAGQ=|"],
+		["a b #c\n d", ReliableTxtEncoding.Utf16, "Base64|/v8AYQAgAGIAIAAjAGMACgAgAGQ|"],
 	])(
 		"Given %j and %p returns %p",
 		(input1, input2, output) => {
@@ -937,7 +937,7 @@ describe("WsvDocument.fromBase64String", () => {
 	test.each([
 		["Base64|77u/|", "", ReliableTxtEncoding.Utf8],
 		["Base64|77u/YSBiICNjCiBk|", "a b #c\n d", ReliableTxtEncoding.Utf8],
-		["Base64|/v8AYQAgAGIAIAAjAGMACgAgAGQ=|", "a b #c\n d", ReliableTxtEncoding.Utf16],
+		["Base64|/v8AYQAgAGIAIAAjAGMACgAgAGQ|", "a b #c\n d", ReliableTxtEncoding.Utf16],
 	])(
 		"Given %p returns %j and %p",
 		(input, output1, output2) => {
