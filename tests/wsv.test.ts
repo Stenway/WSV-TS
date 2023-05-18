@@ -1,5 +1,5 @@
 ﻿import { NoReliableTxtPreambleError, ReliableTxtEncoding } from "@stenway/reliabletxt"
-import { WsvDocument, WsvLine, WsvParserError, WsvSerializer, WsvStringUtil, WsvValue } from "../src"
+import { WsvDocument, WsvLine, WsvParserError, WsvSerializer, WsvStringUtil, WsvValue } from "../src/wsv.js"
 
 test("WsvParserError.constructor", () => {
 	const error = new WsvParserError(10, 2, 3, "Test")

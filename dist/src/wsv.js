@@ -1,10 +1,7 @@
-"use strict";
 /* (C) Stefan John / Stenway / WhitespaceSV.com / 2023 */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.WsvParser = exports.WsvSerializer = exports.WsvValue = exports.WsvDocument = exports.WsvLine = exports.WsvStringUtil = exports.WsvParserError = void 0;
-const reliabletxt_1 = require("@stenway/reliabletxt");
+import { Base64String, InvalidUtf16StringError, ReliableTxtDocument, ReliableTxtEncoding, ReliableTxtLines, Utf16String } from "@stenway/reliabletxt";
 // ----------------------------------------------------------------------
-class WsvParserError extends Error {
+export class WsvParserError extends Error {
     constructor(index, lineIndex, linePosition, message) {
         super(`${message} (${lineIndex + 1}, ${linePosition + 1})`);
         this.index = index;
@@ -12,9 +9,8 @@ class WsvParserError extends Error {
         this.linePosition = linePosition;
     }
 }
-exports.WsvParserError = WsvParserError;
 // ----------------------------------------------------------------------
-class WsvStringUtil {
+export class WsvStringUtil {
     static validateWhitespaceStrings(values) {
         if (values !== null) {
             for (let i = 0; i < values.length; i++) {
@@ -73,27 +69,19 @@ class WsvStringUtil {
                 else if (codeUnit >= 0xD800 && codeUnit <= 0xDFFF) {
                     i++;
                     if (codeUnit >= 0xDC00 || i >= value.length) {
-                        throw new reliabletxt_1.InvalidUtf16StringError();
+                        throw new InvalidUtf16StringError();
                     }
                     const secondCodeUnit = value.charCodeAt(i);
                     if (!(secondCodeUnit >= 0xDC00 && secondCodeUnit <= 0xDFFF)) {
-                        throw new reliabletxt_1.InvalidUtf16StringError();
+                        throw new InvalidUtf16StringError();
                     }
                 }
             }
         }
     }
 }
-exports.WsvStringUtil = WsvStringUtil;
 // ----------------------------------------------------------------------
-class WsvLine {
-    constructor(values, whitespaces = null, comment = null) {
-        this._whitespaces = null;
-        this._comment = null;
-        this.values = values;
-        this.whitespaces = whitespaces;
-        this.comment = comment;
-    }
+export class WsvLine {
     get hasValues() {
         return this.values.length > 0;
     }
@@ -121,6 +109,13 @@ class WsvLine {
     }
     get hasComment() {
         return this._comment !== null;
+    }
+    constructor(values, whitespaces = null, comment = null) {
+        this._whitespaces = null;
+        this._comment = null;
+        this.values = values;
+        this.whitespaces = whitespaces;
+        this.comment = comment;
     }
     set(values, whitespaces = null, comment = null) {
         this.values = values;
@@ -154,10 +149,9 @@ class WsvLine {
         return WsvSerializer.serializeValues(values);
     }
 }
-exports.WsvLine = WsvLine;
 // ----------------------------------------------------------------------
-class WsvDocument {
-    constructor(lines = [], encoding = reliabletxt_1.ReliableTxtEncoding.Utf8) {
+export class WsvDocument {
+    constructor(lines = [], encoding = ReliableTxtEncoding.Utf8) {
         this.lines = lines;
         this.encoding = encoding;
     }
@@ -177,20 +171,20 @@ class WsvDocument {
     }
     getBytes(preserveWhitespacesAndComments = true) {
         const str = this.toString(preserveWhitespacesAndComments);
-        return new reliabletxt_1.ReliableTxtDocument(str, this.encoding).getBytes();
+        return new ReliableTxtDocument(str, this.encoding).getBytes();
     }
     toBase64String(preserveWhitespacesAndComments = true) {
         const str = this.toString(preserveWhitespacesAndComments);
-        return reliabletxt_1.Base64String.fromText(str, this.encoding);
+        return Base64String.fromText(str, this.encoding);
     }
-    static parse(str, preserveWhitespacesAndComments = true, encoding = reliabletxt_1.ReliableTxtEncoding.Utf8) {
+    static parse(str, preserveWhitespacesAndComments = true, encoding = ReliableTxtEncoding.Utf8) {
         const lines = WsvParser.parseLines(str, preserveWhitespacesAndComments);
         return new WsvDocument(lines, encoding);
     }
     static parseAsJaggedArray(str) {
         return WsvParser.parseAsJaggedArray(str);
     }
-    static fromJaggedArray(jaggedArray, encoding = reliabletxt_1.ReliableTxtEncoding.Utf8) {
+    static fromJaggedArray(jaggedArray, encoding = ReliableTxtEncoding.Utf8) {
         const document = new WsvDocument();
         for (const values of jaggedArray) {
             document.addLine(values);
@@ -199,23 +193,22 @@ class WsvDocument {
         return document;
     }
     static fromBytes(bytes, preserveWhitespacesAndComments = true) {
-        const txtDocument = reliabletxt_1.ReliableTxtDocument.fromBytes(bytes);
+        const txtDocument = ReliableTxtDocument.fromBytes(bytes);
         const document = WsvDocument.parse(txtDocument.text, preserveWhitespacesAndComments, txtDocument.encoding);
         return document;
     }
-    static fromLines(lines, preserveWhitespacesAndComments = true, encoding = reliabletxt_1.ReliableTxtEncoding.Utf8) {
-        const content = reliabletxt_1.ReliableTxtLines.join(lines);
+    static fromLines(lines, preserveWhitespacesAndComments = true, encoding = ReliableTxtEncoding.Utf8) {
+        const content = ReliableTxtLines.join(lines);
         const document = WsvDocument.parse(content, preserveWhitespacesAndComments, encoding);
         return document;
     }
     static fromBase64String(base64Str) {
-        const bytes = reliabletxt_1.Base64String.toBytes(base64Str);
+        const bytes = Base64String.toBytes(base64Str);
         return this.fromBytes(bytes);
     }
 }
-exports.WsvDocument = WsvDocument;
 // ----------------------------------------------------------------------
-class WsvValue {
+export class WsvValue {
     static containsSpecialChar(value) {
         for (let i = 0; i < value.length; i++) {
             const c = value.charCodeAt(i);
@@ -252,11 +245,11 @@ class WsvValue {
             if (c >= 0xD800 && c <= 0xDFFF) {
                 i++;
                 if (c >= 0xDC00 || i >= value.length) {
-                    throw new reliabletxt_1.InvalidUtf16StringError();
+                    throw new InvalidUtf16StringError();
                 }
                 const secondCodeUnit = value.charCodeAt(i);
                 if (!(secondCodeUnit >= 0xDC00 && secondCodeUnit <= 0xDFFF)) {
-                    throw new reliabletxt_1.InvalidUtf16StringError();
+                    throw new InvalidUtf16StringError();
                 }
             }
         }
@@ -322,7 +315,7 @@ class WsvValue {
                 }
             }
             view.setUint16(index, 0x0022, false);
-            return reliabletxt_1.Utf16String.fromUtf16Bytes(bytes, false, false);
+            return Utf16String.fromUtf16Bytes(bytes, false, false);
         }
         else {
             return value;
@@ -349,9 +342,8 @@ class WsvValue {
         return line.values[0];
     }
 }
-exports.WsvValue = WsvValue;
 // ----------------------------------------------------------------------
-class WsvSerializer {
+export class WsvSerializer {
     static serializeValues(values) {
         const strings = [];
         for (let i = 0; i < values.length; i++) {
@@ -369,7 +361,7 @@ class WsvSerializer {
             const line = WsvSerializer.serializeValues(values);
             lines.push(line);
         }
-        return reliabletxt_1.ReliableTxtLines.join(lines);
+        return ReliableTxtLines.join(lines);
     }
     static internalSerializeValuesWhitespacesAndComment(values, whitespaces, comment) {
         var _a;
@@ -398,10 +390,9 @@ class WsvSerializer {
         for (const line of lines) {
             lineStrings.push(line.toString(preserveWhitespaceAndComment));
         }
-        return reliabletxt_1.ReliableTxtLines.join(lineStrings);
+        return ReliableTxtLines.join(lineStrings);
     }
 }
-exports.WsvSerializer = WsvSerializer;
 // ----------------------------------------------------------------------
 class WsvParser {
     static parseLine(str, preserveWhitespacesAndComments, lineIndexOffset = 0) {
@@ -515,11 +506,11 @@ class WsvParser {
                             }
                             else if (codeUnit >= 0xD800 && codeUnit <= 0xDFFF) {
                                 if (codeUnit >= 0xDC00 || index >= str.length) {
-                                    throw new reliabletxt_1.InvalidUtf16StringError();
+                                    throw new InvalidUtf16StringError();
                                 }
                                 const secondCodeUnit = str.charCodeAt(index);
                                 if (!(secondCodeUnit >= 0xDC00 && secondCodeUnit <= 0xDFFF)) {
-                                    throw new reliabletxt_1.InvalidUtf16StringError();
+                                    throw new InvalidUtf16StringError();
                                 }
                                 index++;
                             }
@@ -608,11 +599,11 @@ class WsvParser {
                                 strCodeUnits.push(String.fromCharCode(codeUnit));
                                 if (codeUnit >= 0xD800 && codeUnit <= 0xDFFF) {
                                     if (codeUnit >= 0xDC00 || index >= str.length) {
-                                        throw new reliabletxt_1.InvalidUtf16StringError();
+                                        throw new InvalidUtf16StringError();
                                     }
                                     const secondCodeUnit = str.charCodeAt(index);
                                     if (!(secondCodeUnit >= 0xDC00 && secondCodeUnit <= 0xDFFF)) {
-                                        throw new reliabletxt_1.InvalidUtf16StringError();
+                                        throw new InvalidUtf16StringError();
                                     }
                                     strCodeUnits.push(String.fromCharCode(secondCodeUnit));
                                     index++;
@@ -658,11 +649,11 @@ class WsvParser {
                         if (codeUnit >= 0xD800 && codeUnit <= 0xDFFF) {
                             index++;
                             if (codeUnit >= 0xDC00 || index >= str.length) {
-                                throw new reliabletxt_1.InvalidUtf16StringError();
+                                throw new InvalidUtf16StringError();
                             }
                             const secondCodeUnit = str.charCodeAt(index);
                             if (!(secondCodeUnit >= 0xDC00 && secondCodeUnit <= 0xDFFF)) {
-                                throw new reliabletxt_1.InvalidUtf16StringError();
+                                throw new InvalidUtf16StringError();
                             }
                         }
                         index++;
@@ -764,11 +755,11 @@ class WsvParser {
                             }
                             else if (codeUnit >= 0xD800 && codeUnit <= 0xDFFF) {
                                 if (codeUnit >= 0xDC00 || index >= str.length) {
-                                    throw new reliabletxt_1.InvalidUtf16StringError();
+                                    throw new InvalidUtf16StringError();
                                 }
                                 const secondCodeUnit = str.charCodeAt(index);
                                 if (!(secondCodeUnit >= 0xDC00 && secondCodeUnit <= 0xDFFF)) {
-                                    throw new reliabletxt_1.InvalidUtf16StringError();
+                                    throw new InvalidUtf16StringError();
                                 }
                                 index++;
                             }
@@ -851,11 +842,11 @@ class WsvParser {
                                 strCodeUnits.push(String.fromCharCode(codeUnit));
                                 if (codeUnit >= 0xD800 && codeUnit <= 0xDFFF) {
                                     if (codeUnit >= 0xDC00 || index >= str.length) {
-                                        throw new reliabletxt_1.InvalidUtf16StringError();
+                                        throw new InvalidUtf16StringError();
                                     }
                                     const secondCodeUnit = str.charCodeAt(index);
                                     if (!(secondCodeUnit >= 0xDC00 && secondCodeUnit <= 0xDFFF)) {
-                                        throw new reliabletxt_1.InvalidUtf16StringError();
+                                        throw new InvalidUtf16StringError();
                                     }
                                     strCodeUnits.push(String.fromCharCode(secondCodeUnit));
                                     index++;
@@ -901,11 +892,11 @@ class WsvParser {
                         if (codeUnit >= 0xD800 && codeUnit <= 0xDFFF) {
                             index++;
                             if (codeUnit >= 0xDC00 || index >= str.length) {
-                                throw new reliabletxt_1.InvalidUtf16StringError();
+                                throw new InvalidUtf16StringError();
                             }
                             const secondCodeUnit = str.charCodeAt(index);
                             if (!(secondCodeUnit >= 0xDC00 && secondCodeUnit <= 0xDFFF)) {
-                                throw new reliabletxt_1.InvalidUtf16StringError();
+                                throw new InvalidUtf16StringError();
                             }
                         }
                         index++;
@@ -1007,11 +998,11 @@ class WsvParser {
                             }
                             else if (codeUnit >= 0xD800 && codeUnit <= 0xDFFF) {
                                 if (codeUnit >= 0xDC00 || index >= str.length) {
-                                    throw new reliabletxt_1.InvalidUtf16StringError();
+                                    throw new InvalidUtf16StringError();
                                 }
                                 const secondCodeUnit = str.charCodeAt(index);
                                 if (!(secondCodeUnit >= 0xDC00 && secondCodeUnit <= 0xDFFF)) {
-                                    throw new reliabletxt_1.InvalidUtf16StringError();
+                                    throw new InvalidUtf16StringError();
                                 }
                                 index++;
                             }
@@ -1094,11 +1085,11 @@ class WsvParser {
                                 strCodeUnits.push(String.fromCharCode(codeUnit));
                                 if (codeUnit >= 0xD800 && codeUnit <= 0xDFFF) {
                                     if (codeUnit >= 0xDC00 || index >= str.length) {
-                                        throw new reliabletxt_1.InvalidUtf16StringError();
+                                        throw new InvalidUtf16StringError();
                                     }
                                     const secondCodeUnit = str.charCodeAt(index);
                                     if (!(secondCodeUnit >= 0xDC00 && secondCodeUnit <= 0xDFFF)) {
-                                        throw new reliabletxt_1.InvalidUtf16StringError();
+                                        throw new InvalidUtf16StringError();
                                     }
                                     strCodeUnits.push(String.fromCharCode(secondCodeUnit));
                                     index++;
@@ -1144,11 +1135,11 @@ class WsvParser {
                         if (codeUnit >= 0xD800 && codeUnit <= 0xDFFF) {
                             index++;
                             if (codeUnit >= 0xDC00 || index >= str.length) {
-                                throw new reliabletxt_1.InvalidUtf16StringError();
+                                throw new InvalidUtf16StringError();
                             }
                             const secondCodeUnit = str.charCodeAt(index);
                             if (!(secondCodeUnit >= 0xDC00 && secondCodeUnit <= 0xDFFF)) {
-                                throw new reliabletxt_1.InvalidUtf16StringError();
+                                throw new InvalidUtf16StringError();
                             }
                         }
                         index++;
@@ -1168,9 +1159,9 @@ class WsvParser {
         return lines;
     }
 }
-exports.WsvParser = WsvParser;
 WsvParser.stringNotClosed = "String not closed";
 WsvParser.invalidStringLineBreak = "Invalid string line break";
 WsvParser.invalidCharacterAfterString = "Invalid character after string";
 WsvParser.invalidDoubleQuoteInValue = "Invalid double quote in value";
+export { WsvParser };
 //# sourceMappingURL=wsv.js.map
