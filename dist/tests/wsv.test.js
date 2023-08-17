@@ -1,5 +1,22 @@
-import { NoReliableTxtPreambleError, ReliableTxtEncoding } from "@stenway/reliabletxt";
-import { WsvDocument, WsvLine, WsvParserError, WsvSerializer, WsvStringUtil, WsvValue } from "../src/wsv.js";
+import { NoReliableTxtPreambleError, ReliableTxtEncoding, Utf16String } from "@stenway/reliabletxt";
+import { BinaryWsvDecoder, BinaryWsvEncoder, BinaryWsvUtil, Uint8ArrayReader, VarInt56Decoder, VarInt56Encoder, WsvDocument, WsvLine, WsvParserError, WsvSerializer, WsvStringUtil, WsvValue } from "../src/wsv.js";
+function getTestTable() {
+    return `a 	U+0061    61            0061        "Latin Small Letter A"
+~ 	U+007E    7E            007E        Tilde
+¥ 	U+00A5    C2_A5         00A5        "Yen Sign"
+» 	U+00BB    C2_BB         00BB        "Right-Pointing Double Angle Quotation Mark"
+½ 	U+00BD    C2_BD         00BD        "Vulgar Fraction One Half"
+¿ 	U+00BF    C2_BF         00BF        "Inverted Question Mark"
+ß 	U+00DF    C3_9F         00DF        "Latin Small Letter Sharp S"
+ä 	U+00E4    C3_A4         00E4        "Latin Small Letter A with Diaeresis"
+ï 	U+00EF    C3_AF         00EF        "Latin Small Letter I with Diaeresis"
+œ 	U+0153    C5_93         0153        "Latin Small Ligature Oe"
+€ 	U+20AC    E2_82_AC      20AC        "Euro Sign"
+東 	U+6771    E6_9D_B1      6771        "CJK Unified Ideograph-6771"
+𝄞 	U+1D11E   F0_9D_84_9E   D834_DD1E   "Musical Symbol G Clef"
+𠀇 	U+20007   F0_A0_80_87   D840_DC07   "CJK Unified Ideograph-20007"`;
+}
+// ----------------------------------------------------------------------
 test("WsvParserError.constructor", () => {
     const error = new WsvParserError(10, 2, 3, "Test");
     expect(error.message).toEqual("Test (3, 4)");
@@ -178,9 +195,8 @@ test("WsvLine.internal", () => {
     expect(line.comment).toEqual("\n");
 });
 test("WsvLine.internalWhitespaces", () => {
-    var _a;
     const line = new WsvLine([], []);
-    const whitespaces = (_a = WsvLine.internalWhitespaces(line)) !== null && _a !== void 0 ? _a : [];
+    const whitespaces = WsvLine.internalWhitespaces(line) ?? [];
     whitespaces[0] = "a";
     expect(line.whitespaces).toEqual(["a"]);
 });
@@ -796,8 +812,426 @@ describe("WsvDocument.fromBase64String", () => {
         expect(() => WsvDocument.fromBase64String(input)).toThrow();
     });
 });
+test("WsvDocument.toBinaryWsv + fromBinaryWsv", () => {
+    const text = getTestTable();
+    const document = WsvDocument.parse(text, false);
+    const bytes = document.toBinaryWsv();
+    expect(bytes.subarray(0, 5)).toEqual(BinaryWsvUtil.getPreambleVersion1());
+    const decodedDocument = WsvDocument.fromBinaryWsv(bytes);
+    expect(document.toString()).toEqual(decodedDocument.toString());
+});
 // ----------------------------------------------------------------------
 test("WsvSerializer.serializeLines", () => {
     expect(WsvSerializer.serializeLines([new WsvLine(["a", "b"]), new WsvLine([]), new WsvLine(["c"])])).toEqual("a b\n\nc");
+});
+// ----------------------------------------------------------------------
+test("BinaryWsvEncodingUtil.getPreamble", () => {
+    expect(BinaryWsvUtil.getPreambleVersion1()).toEqual(new Uint8Array([0x42, 0x57, 0x53, 0x56, 0x31]));
+});
+// ----------------------------------------------------------------------
+describe("VarInt56Encoder.encode + encodeIntoBuffer", () => {
+    test.each([
+        [0, [0b00000001]],
+        [1, [0b00000011]],
+        [63, [0b01111111]],
+        [64, [0b00000010, 0b01000000]],
+        [65, [0b00000010, 0b01000001]],
+        [257, [0b00001010, 0b00000001]],
+        [4095, [0b01111110, 0b01111111]],
+        [4096, [0b00000100, 0b00100000, 0b00000000]],
+        [4097, [0b00000100, 0b00100000, 0b00000001]],
+        [65793, [0b00100100, 0b00000010, 0b00000001]],
+        [262143, [0b01111100, 0b01111111, 0b01111111]],
+        [262144, [0b00001000, 0b00010000, 0b00000000, 0b00000000]],
+        [262145, [0b00001000, 0b00010000, 0b00000000, 0b00000001]],
+        [4260097, [0b00101000, 0b00000100, 0b00000010, 0b00000001]],
+        [16777215, [0b01111000, 0b01111111, 0b01111111, 0b01111111]],
+        [16777216, [0b00010000, 0b00001000, 0b00000000, 0b00000000, 0b00000000]],
+        [16777217, [0b00010000, 0b00001000, 0b00000000, 0b00000000, 0b00000001]],
+        [553713921, [0b01010000, 0b00001000, 0b00000100, 0b00000010, 0b00000001]],
+        [1073741823, [0b01110000, 0b01111111, 0b01111111, 0b01111111, 0b01111111]],
+        [1073741824, [0b00100000, 0b00000100, 0b00000000, 0b00000000, 0b00000000, 0b00000000]],
+        [1073741825, [0b00100000, 0b00000100, 0b00000000, 0b00000000, 0b00000000, 0b00000001]],
+        [38671548673, [0b01100000, 0b00010000, 0b00001000, 0b00000100, 0b00000010, 0b00000001]],
+        [68719476735, [0b01100000, 0b01111111, 0b01111111, 0b01111111, 0b01111111, 0b01111111]],
+        [68719476736, [0b01000000, 0b00000010, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000]],
+        [68719476737, [0b01000000, 0b00000010, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000001]],
+        [1103823438081, [0b01000000, 0b00100000, 0b00010000, 0b00001000, 0b00000100, 0b00000010, 0b00000001]],
+        [4398046511103, [0b01000000, 0b01111111, 0b01111111, 0b01111111, 0b01111111, 0b01111111, 0b01111111]],
+        [4398046511104, [0b00000000, 0b00000000, 0b00000001, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000]],
+        [4398046511105, [0b00000000, 0b00000000, 0b00000001, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000001]],
+        [845528753570049, [0b00000000, 0b00000001, 0b01000000, 0b00100000, 0b00010000, 0b00001000, 0b00000100, 0b00000010, 0b00000001]],
+        [9007199254740991, [0b00000000, 0b00001111, 0b01111111, 0b01111111, 0b01111111, 0b01111111, 0b01111111, 0b01111111, 0b01111111]],
+    ])("Given %p returns %p", (input, output) => {
+        const byteArray = VarInt56Encoder.encode(input);
+        expect(byteArray).toEqual(new Uint8Array(output));
+        const buffer = new Uint8Array(9);
+        const length = VarInt56Encoder.encodeIntoBuffer(input, buffer, 0);
+        expect(length).toEqual(byteArray.length);
+        expect(buffer.slice(0, length)).toEqual(byteArray);
+    });
+    test.each([
+        [-1],
+        [0.5],
+        [9007199254740992],
+    ])("Given %p throws", (input) => {
+        expect(() => VarInt56Encoder.encode(input)).toThrow();
+        const buffer = new Uint8Array(9);
+        expect(() => VarInt56Encoder.encodeIntoBuffer(input, buffer, 0)).toThrow();
+        expect(() => VarInt56Encoder.encodeAsString(input)).toThrow();
+    });
+    test.each([
+        [0],
+        [64],
+        [4096],
+        [262144],
+        [16777216],
+        [1073741824],
+        [68719476736],
+        [4398046511104],
+    ])("Given %p throws", (input) => {
+        const buffer = new Uint8Array(0);
+        expect(() => VarInt56Encoder.encodeIntoBuffer(input, buffer, 0)).toThrow();
+    });
+});
+describe("VarInt56Encoder.encodeAsString", () => {
+    test.each([
+        [0, "\u0001"],
+        [64, "\u0002\u0040"],
+        [4096, "\u0004\u0020\u0000"],
+        [262144, "\u0008\u0010\u0000\u0000"],
+        [16777216, "\u0010\u0008\u0000\u0000\u0000"],
+        [1073741824, "\u0020\u0004\u0000\u0000\u0000\u0000"],
+        [68719476736, "\u0040\u0002\u0000\u0000\u0000\u0000\u0000"],
+        [4398046511104, "\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000"],
+    ])("Given %p returns %j", (input, output) => {
+        const result = VarInt56Encoder.encodeAsString(input);
+        expect(result).toEqual(output);
+    });
+});
+test("VarInt56Encoder.encodeAsString + BinaryWsvDecoder.decode", () => {
+    const str0 = "";
+    const str1 = "A";
+    const str2 = "Ab";
+    const binaryWsvStr = "BWSV1" +
+        VarInt56Encoder.encodeAsString(1) +
+        VarInt56Encoder.encodeAsString(2) +
+        VarInt56Encoder.encodeAsString(Utf16String.getUtf8ByteCount(str1) + 2) + str1 +
+        VarInt56Encoder.encodeAsString(0) +
+        VarInt56Encoder.encodeAsString(Utf16String.getUtf8ByteCount(str2) + 2) + str2;
+    const textEncoder = new TextEncoder();
+    const bytes = textEncoder.encode(binaryWsvStr);
+    const jaggedArray = BinaryWsvDecoder.decodeAsJaggedArray(bytes, true);
+    expect(jaggedArray).toEqual([[null, str0, str1], [str2]]);
+});
+// ----------------------------------------------------------------------
+describe("VarInt56Decoder.decode", () => {
+    test.each([
+        [[0b00000001], 0, 1],
+        [[0b00000011], 1, 1],
+        [[0b01111111], 63, 1],
+        [[0b00000010, 0b01000000], 64, 2],
+        [[0b00000010, 0b01000001], 65, 2],
+        [[0b00001010, 0b00000001], 257, 2],
+        [[0b01111110, 0b01111111], 4095, 2],
+        [[0b00000100, 0b00100000, 0b00000000], 4096, 3],
+        [[0b00000100, 0b00100000, 0b00000001], 4097, 3],
+        [[0b00100100, 0b00000010, 0b00000001], 65793, 3],
+        [[0b01111100, 0b01111111, 0b01111111], 262143, 3],
+        [[0b00001000, 0b00010000, 0b00000000, 0b00000000], 262144, 4],
+        [[0b00001000, 0b00010000, 0b00000000, 0b00000001], 262145, 4],
+        [[0b00101000, 0b00000100, 0b00000010, 0b00000001], 4260097, 4],
+        [[0b01111000, 0b01111111, 0b01111111, 0b01111111], 16777215, 4],
+        [[0b00010000, 0b00001000, 0b00000000, 0b00000000, 0b00000000], 16777216, 5],
+        [[0b00010000, 0b00001000, 0b00000000, 0b00000000, 0b00000001], 16777217, 5],
+        [[0b01010000, 0b00001000, 0b00000100, 0b00000010, 0b00000001], 553713921, 5],
+        [[0b01110000, 0b01111111, 0b01111111, 0b01111111, 0b01111111], 1073741823, 5],
+        [[0b00100000, 0b00000100, 0b00000000, 0b00000000, 0b00000000, 0b00000000], 1073741824, 6],
+        [[0b00100000, 0b00000100, 0b00000000, 0b00000000, 0b00000000, 0b00000001], 1073741825, 6],
+        [[0b01100000, 0b00010000, 0b00001000, 0b00000100, 0b00000010, 0b00000001], 38671548673, 6],
+        [[0b01100000, 0b01111111, 0b01111111, 0b01111111, 0b01111111, 0b01111111], 68719476735, 6],
+        [[0b01000000, 0b00000010, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000], 68719476736, 7],
+        [[0b01000000, 0b00000010, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000001], 68719476737, 7],
+        [[0b01000000, 0b00100000, 0b00010000, 0b00001000, 0b00000100, 0b00000010, 0b00000001], 1103823438081, 7],
+        [[0b01000000, 0b01111111, 0b01111111, 0b01111111, 0b01111111, 0b01111111, 0b01111111], 4398046511103, 7],
+        [[0b00000000, 0b00000000, 0b00000001, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000], 4398046511104, 9],
+        [[0b00000000, 0b00000000, 0b00000001, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000001], 4398046511105, 9],
+        [[0b00000000, 0b00000001, 0b01000000, 0b00100000, 0b00010000, 0b00001000, 0b00000100, 0b00000010, 0b00000001], 845528753570049, 9],
+        [[0b00000000, 0b00001111, 0b01111111, 0b01111111, 0b01111111, 0b01111111, 0b01111111, 0b01111111, 0b01111111], 9007199254740991, 9],
+        [[0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000], 0, 9],
+    ])("Given %p returns %p and %p", (input, output1, output2) => {
+        const [value, length] = VarInt56Decoder.decode(new Uint8Array(input));
+        expect(value).toEqual(output1);
+        expect(length).toEqual(output2);
+        const reader = new Uint8ArrayReader(new Uint8Array(input), 0);
+        expect(reader.readVarInt56()).toEqual(output1);
+        expect(reader.offset).toEqual(output2);
+    });
+    test.each([
+        [[0b10000000], 0],
+        [[0b00000001], 1],
+        [[0b00000001], -1],
+        [[0b00000010], 0],
+        [[0b00000010, 0b10000000], 0],
+        [[0b00000100], 0],
+        [[0b00000100, 0b10000000, 0b00000000], 0],
+        [[0b00000100, 0b00000000, 0b10000000], 0],
+        [[0b00001000], 0],
+        [[0b00001000, 0b10000000, 0b00000000, 0b00000000], 0],
+        [[0b00001000, 0b00000000, 0b10000000, 0b00000000], 0],
+        [[0b00001000, 0b00000000, 0b00000000, 0b10000000], 0],
+        [[0b00010000], 0],
+        [[0b00010000, 0b10000000, 0b00000000, 0b00000000, 0b00000000], 0],
+        [[0b00010000, 0b00000000, 0b10000000, 0b00000000, 0b00000000], 0],
+        [[0b00010000, 0b00000000, 0b00000000, 0b10000000, 0b00000000], 0],
+        [[0b00010000, 0b00000000, 0b00000000, 0b00000000, 0b10000000], 0],
+        [[0b00100000], 0],
+        [[0b00100000, 0b10000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000], 0],
+        [[0b00100000, 0b00000000, 0b10000000, 0b00000000, 0b00000000, 0b00000000], 0],
+        [[0b00100000, 0b00000000, 0b00000000, 0b10000000, 0b00000000, 0b00000000], 0],
+        [[0b00100000, 0b00000000, 0b00000000, 0b00000000, 0b10000000, 0b00000000], 0],
+        [[0b00100000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b10000000], 0],
+        [[0b01000000], 0],
+        [[0b01000000, 0b10000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000], 0],
+        [[0b01000000, 0b00000000, 0b10000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000], 0],
+        [[0b01000000, 0b00000000, 0b00000000, 0b10000000, 0b00000000, 0b00000000, 0b00000000], 0],
+        [[0b01000000, 0b00000000, 0b00000000, 0b00000000, 0b10000000, 0b00000000, 0b00000000], 0],
+        [[0b01000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b10000000, 0b00000000], 0],
+        [[0b01000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b10000000], 0],
+        [[0b00000000], 0],
+        [[0b00000000, 0b10000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000], 0],
+        [[0b00000000, 0b00000000, 0b10000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000], 0],
+        [[0b00000000, 0b00000000, 0b00000000, 0b10000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000], 0],
+        [[0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b10000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000], 0],
+        [[0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b10000000, 0b00000000, 0b00000000, 0b00000000], 0],
+        [[0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b10000000, 0b00000000, 0b00000000], 0],
+        [[0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b10000000, 0b00000000], 0],
+        [[0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b10000000], 0],
+        [[0b00000000, 0b00010000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000], 0],
+    ])("Given %p and %p throws", (input1, input2) => {
+        expect(() => VarInt56Decoder.decode(new Uint8Array(input1), input2)).toThrow();
+        const reader = new Uint8ArrayReader(new Uint8Array(input1), input2);
+        expect(() => reader.readVarInt56()).toThrow();
+    });
+});
+describe("VarInt56Decoder.getLengthFromFirstByte", () => {
+    test.each([
+        [[0b00000001], 1],
+        [[0b00000010], 2],
+        [[0b00000100], 3],
+        [[0b00001000], 4],
+        [[0b00010000], 5],
+        [[0b00100000], 6],
+        [[0b01000000], 7],
+        [[0b00000000], 9],
+    ])("Given %p returns %p", (input, output) => {
+        const length = VarInt56Decoder.getLengthFromFirstByte(new Uint8Array(input));
+        expect(length).toEqual(output);
+    });
+    test.each([
+        [[]],
+        [[0b10000000]],
+    ])("Given %p throws", (input) => {
+        expect(() => VarInt56Decoder.getLengthFromFirstByte(new Uint8Array(input))).toThrow();
+    });
+});
+// ----------------------------------------------------------------------
+const lineBreakByte = 0b00000001;
+const nullValueByte = 0b00000011;
+const emptyStringByte = 0b00000101;
+// ----------------------------------------------------------------------
+describe("BinaryWsvEncoder.encodeJaggedArray", () => {
+    test.each([
+        [[], []],
+        [[[]], []],
+        [[[], []], [lineBreakByte]],
+        [[[], [], []], [lineBreakByte, lineBreakByte]],
+        [[[null]], [nullValueByte]],
+        [[[null], [null]], [nullValueByte, lineBreakByte, nullValueByte]],
+        [[[null], [null], [null]], [nullValueByte, lineBreakByte, nullValueByte, lineBreakByte, nullValueByte]],
+        [[[], [null]], [lineBreakByte, nullValueByte]],
+        [[[], [null], [null]], [lineBreakByte, nullValueByte, lineBreakByte, nullValueByte]],
+        [[[], [], [null]], [lineBreakByte, lineBreakByte, nullValueByte]],
+        [[[null], [], [null]], [nullValueByte, lineBreakByte, lineBreakByte, nullValueByte]],
+        [[[""]], [emptyStringByte]],
+        [[["a"]], [0b00000111, 0x61]],
+        [[["a"], ["b"]], [0b00000111, 0x61, lineBreakByte, 0b00000111, 0x62]],
+    ])("Given %p returns %p", (input, output) => {
+        const bytes = BinaryWsvEncoder.encodeJaggedArray(input);
+        expect(bytes).toEqual(new Uint8Array([0x42, 0x57, 0x53, 0x56, 0x31, ...output]));
+    });
+    test.each([
+        [[["\uDEAD"]]],
+    ])("Given %p throws", (input) => {
+        expect(() => BinaryWsvEncoder.encodeJaggedArray(input)).toThrow();
+    });
+});
+test("BinaryWsvEncoder.encodeJaggedArray without preamble", () => {
+    let bytes = BinaryWsvEncoder.encodeJaggedArray([[null]], false);
+    expect(bytes).toEqual(new Uint8Array([nullValueByte]));
+    bytes = BinaryWsvEncoder.encodeJaggedArray([], false);
+    expect(bytes).toEqual(new Uint8Array());
+});
+test("BinaryWsvEncoder.encode without preamble", () => {
+    let bytes = BinaryWsvEncoder.encode(WsvDocument.fromJaggedArray([[null]]), false);
+    expect(bytes).toEqual(new Uint8Array([nullValueByte]));
+    bytes = BinaryWsvEncoder.encode(new WsvDocument(), false);
+    expect(bytes).toEqual(new Uint8Array());
+});
+test("BinaryWsvEncoder.encodeValues", () => {
+    const bytes = BinaryWsvEncoder.encodeValues([null, "a"]);
+    expect(bytes).toEqual(new Uint8Array([nullValueByte, 0b00000111, 0x61]));
+});
+test("BinaryWsvEncoder.encodeValues with long values", () => {
+    const longValue = "b".repeat(10000);
+    const values = ["a", longValue];
+    const bytes = BinaryWsvEncoder.encodeValues(values);
+    const decodedValues = BinaryWsvDecoder.decodeAsJaggedArray(bytes, false);
+    expect(decodedValues[0]).toEqual(values);
+});
+// ----------------------------------------------------------------------
+describe("BinaryWsvDecoder.getVersion", () => {
+    test.each([
+        [[0x42, 0x57, 0x53, 0x56, 0x31], "1"],
+        [[0x42, 0x57, 0x53, 0x56, 0x32, 0x30], "2"],
+        [[0x42, 0x57, 0x53, 0x56, 0x31, 0x00], "1"],
+    ])("Given %p returns %p", (input, output) => {
+        const version = BinaryWsvDecoder.getVersion(new Uint8Array(input));
+        expect(version).toEqual(output);
+    });
+    test.each([
+        [[0x43, 0x57, 0x53, 0x56, 0x31]],
+        [[0x42, 0x58, 0x53, 0x56, 0x31]],
+        [[0x42, 0x57, 0x54, 0x56, 0x31]],
+        [[0x42, 0x57, 0x53, 0x57, 0x31]],
+        [[0x42, 0x57, 0x53, 0x56]],
+        [[0x42, 0x57, 0x53]],
+        [[0x42, 0x57]],
+        [[0x42]],
+        [[]],
+    ])("Given %p throws", (input) => {
+        expect(() => BinaryWsvDecoder.getVersion(new Uint8Array(input))).toThrow();
+    });
+});
+describe("BinaryWsvDecoder.getVersionOrNull", () => {
+    test.each([
+        [[0x42, 0x57, 0x53, 0x56, 0x31], "1"],
+        [[0x42, 0x57, 0x53, 0x56, 0x31], "1"],
+        [[0x42, 0x57, 0x53, 0x56, 0x32], "2"],
+        [[0x42, 0x57, 0x53, 0x56, 0x31, 0x00], "1"],
+        [[0x43, 0x57, 0x53, 0x56, 0x31], null],
+        [[0x42, 0x58, 0x53, 0x56, 0x31], null],
+        [[0x42, 0x57, 0x54, 0x56, 0x31], null],
+        [[0x42, 0x57, 0x53, 0x57, 0x31], null],
+        [[0x42, 0x57, 0x53, 0x56], null],
+        [[0x42, 0x57, 0x53], null],
+        [[0x42, 0x57], null],
+        [[0x42], null],
+        [[], null],
+    ])("Given %p returns %p", (input, output) => {
+        const version = BinaryWsvDecoder.getVersionOrNull(new Uint8Array(input));
+        expect(version).toEqual(output);
+    });
+});
+describe("BinaryWsvDecoder.decodeAsJaggedArray", () => {
+    test.each([
+        [[], [[]]],
+        [[lineBreakByte], [[], []]],
+        [[lineBreakByte, lineBreakByte], [[], [], []]],
+        [[nullValueByte], [[null]]],
+        [[nullValueByte, lineBreakByte], [[null], []]],
+        [[nullValueByte, lineBreakByte, lineBreakByte], [[null], [], []]],
+        [[lineBreakByte, nullValueByte], [[], [null]]],
+        [[lineBreakByte, nullValueByte, nullValueByte], [[], [null, null]]],
+        [[emptyStringByte], [[""]]],
+        [[0b00000111, 0x61], [["a"]]],
+        [[0b00000111, 0x61, 0b00000111, 0x62, lineBreakByte, 0b00000111, 0x63], [["a", "b"], ["c"]]],
+        [[0b00001101, 0xEF, 0xBB, 0xBF, 0x61], [["\uFEFFa"]]],
+    ])("Given %p returns %p", (input, output) => {
+        const jaggedArray = BinaryWsvDecoder.decodeAsJaggedArray(new Uint8Array([0x42, 0x57, 0x53, 0x56, 0x31, ...input]));
+        expect(jaggedArray).toEqual(output);
+    });
+    test.each([
+        [[0x42, 0x57, 0x53, 0x56, 0x31, 0x31]],
+        [[0x42, 0x57, 0x53, 0x56, 0x32]],
+        [[]],
+        [[0x42, 0x57, 0x53, 0x56, 0x31, 0b00000111]],
+        [[0x42, 0x57, 0x53, 0x56, 0x31, 0b00001001, 0x61]],
+    ])("Given %p throws", (input) => {
+        expect(() => BinaryWsvDecoder.decodeAsJaggedArray(new Uint8Array(input))).toThrow();
+    });
+});
+test("BinaryWsvDecoder.decodeAsJaggedArray without preamble", () => {
+    const jaggedArray = BinaryWsvDecoder.decodeAsJaggedArray(new Uint8Array([nullValueByte]), false);
+    expect(jaggedArray).toEqual([[null]]);
+});
+describe("BinaryWsvDecoder.decode", () => {
+    test.each([
+        [[], [[]]],
+        [[lineBreakByte], [[], []]],
+        [[lineBreakByte, lineBreakByte], [[], [], []]],
+        [[nullValueByte], [[null]]],
+        [[nullValueByte, lineBreakByte], [[null], []]],
+        [[nullValueByte, lineBreakByte, lineBreakByte], [[null], [], []]],
+        [[lineBreakByte, nullValueByte], [[], [null]]],
+        [[lineBreakByte, nullValueByte, nullValueByte], [[], [null, null]]],
+        [[emptyStringByte], [[""]]],
+        [[0b00000111, 0x61], [["a"]]],
+        [[0b00000111, 0x61, 0b00000111, 0x62, lineBreakByte, 0b00000111, 0x63], [["a", "b"], ["c"]]],
+        [[0b00001101, 0xEF, 0xBB, 0xBF, 0x61], [["\uFEFFa"]]],
+    ])("Given %p returns %p", (input, output) => {
+        const document = BinaryWsvDecoder.decode(new Uint8Array([0x42, 0x57, 0x53, 0x56, 0x31, ...input]));
+        expect(document.toJaggedArray()).toEqual(output);
+    });
+    test.each([
+        [[0x42, 0x57, 0x53, 0x56, 0x31, 0x31]],
+        [[0x42, 0x57, 0x53, 0x56, 0x32]],
+        [[]],
+        [[0x42, 0x57, 0x53, 0x56, 0x31, 0b00000111]],
+        [[0x42, 0x57, 0x53, 0x56, 0x31, 0b00001001, 0x61]],
+    ])("Given %p throws", (input) => {
+        expect(() => BinaryWsvDecoder.decode(new Uint8Array(input))).toThrow();
+    });
+});
+test("BinaryWsvDecoder.decode without preamble", () => {
+    const document = BinaryWsvDecoder.decode(new Uint8Array([nullValueByte]), false);
+    expect(document.toJaggedArray()).toEqual([[null]]);
+});
+// ----------------------------------------------------------------------
+describe("BinaryWsvEncoder.encode + BinaryWsvDecoder.decode", () => {
+    test.each([
+        [``],
+        [`a`],
+        [`a b`],
+        [`a b\nc`],
+        [`a b\nc d`],
+        [`\n`],
+        [`\n\n`],
+        [`\na`],
+        [`\na\n`],
+        [`""`],
+        [`"" ""`],
+        [`"" "a"`],
+        [`"" ""\n"" ""`],
+        [`"" - "" -`],
+        [`"\uFEFF"`],
+        [`"\uFEFF\uFEFF"`],
+        [`"\uFEFFa\uFEFF"`],
+        [`"Line1"/"Line2" "Hello ""world"""`],
+        [`"-" - "" "#Comment" #Comment`],
+        [`a ~ ¥ » ½ ¿ ß ä ï œ € 東 𝄞 𠀇`],
+    ])("Given %p", (input) => {
+        const document = WsvDocument.parse(input, false);
+        const bytes = BinaryWsvEncoder.encode(document);
+        const decodedDocument = BinaryWsvDecoder.decode(bytes);
+        expect(document.toString()).toEqual(decodedDocument.toString());
+    });
+    test("Test Table", () => {
+        const testTable = getTestTable();
+        const document = WsvDocument.parse(testTable, false);
+        const bytes = BinaryWsvEncoder.encode(document);
+        const decodedDocument = BinaryWsvDecoder.decode(bytes);
+        expect(document.toString()).toEqual(decodedDocument.toString());
+    });
 });
 //# sourceMappingURL=wsv.test.js.map
