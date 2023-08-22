@@ -1,5 +1,9 @@
 ﻿# Changelog
 
+## 0.8.0
+- BinaryWSV switch
+- renamed WsvDocument.getBytes to toBytes
+
 ## 0.7.0
 - added BinaryWSV support (+ VarInt56)
 

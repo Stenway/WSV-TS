@@ -125,35 +125,9 @@ Jagged array:
 let jaggedArray = WsvDocument.parseAsJaggedArray(`a b c d\ne\nf g - i j k`)
 ```
 
-## VarInt56
-
-VarInt56 is a **UTF-8 compatible** variable-width integer encoding.
-It can encode 2^56 values and uses 1 to 9 bytes.
-
-The scheme looks like this:
-```
-0aaaaaa1                                                        6 Bit = 64
-0bbbba10 0aaaaaaa                                               12 Bit = 4.096
-0ccbb100 0bbbbbba 0aaaaaaa                                      18 Bit = 262.144
-0ccc1000 0cccccbb 0bbbbbba 0aaaaaaa                             24 Bit = 16.777.216         16MB
-0dd10000 0ddddccc 0cccccbb 0bbbbbba 0aaaaaaa                    30 Bit = 1.073.741.824       1GB
-0e100000 0eeedddd 0ddddccc 0cccccbb 0bbbbbba 0aaaaaaa           36 Bit = 68.719.476.736     68GB
-01000000 0ffeeeee 0eeedddd 0ddddccc 0cccccbb 0bbbbbba 0aaaaaaa  42 Bit = 4.398.046.511.104   4TB
-00000000 0ggggggg 0gffffff 0ffeeeee 0eeedddd 0ddddccc 0cccccbb 0bbbbbba 0aaaaaaa  56 Bit = 72.057.594.037.927.936   72PB
-```
-
-Usage:
-```ts
-const bytes = VarInt56Encoder.encode(10)
-const [number, length] = VarInt56Decoder.decode(bytes)
-```
-
 ## BinaryWSV
 
-BinaryWSV is the binary representation of WSV documents. It starts with the magic code 'BWSV'.
-It uses the VarInt56 encoding to encode for example how many bytes a string value will take up space.
-Because it uses VarInt56, the complete file is UTF-8 compatible and can be validated for UTF-8 correctness in one single step which can offer a performance advantage.
-
+BinaryWSV is the binary representation of WSV documents. It starts with the magic code 'BW1'.
 BinaryWSV is made for scenarios, where parsing speed of the textual representation might be a limitation.
 
 Usage:

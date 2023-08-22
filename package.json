@@ -1,6 +1,6 @@
 {
   "name": "@stenway/wsv",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "type": "module",
   "description": "Encode and decode WSV documents",
   "homepage": "https://www.whitespacesv.com",
@@ -28,10 +28,9 @@
     "unicode",
     "utf-8",
     "reliabletxt",
-    "varint",
-    "varint56",
     "binarywsv",
-    "bwsv"
+    "bwsv",
+    "bw1"
   ],
   "author": "Stefan John",
   "license": "MIT",
@@ -47,6 +46,6 @@
     "typescript": "^5.0.4"
   },
   "dependencies": {
-    "@stenway/reliabletxt": "^0.7.0"
+    "@stenway/reliabletxt": "^0.8.0"
   }
 }

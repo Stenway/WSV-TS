@@ -169,9 +169,9 @@ export class WsvDocument {
     toString(preserveWhitespaceAndComment = true) {
         return WsvSerializer.serializeLines(this.lines, preserveWhitespaceAndComment);
     }
-    getBytes(preserveWhitespacesAndComments = true) {
+    toBytes(preserveWhitespacesAndComments = true) {
         const str = this.toString(preserveWhitespacesAndComments);
-        return new ReliableTxtDocument(str, this.encoding).getBytes();
+        return new ReliableTxtDocument(str, this.encoding).toBytes();
     }
     toBase64String(preserveWhitespacesAndComments = true) {
         const str = this.toString(preserveWhitespacesAndComments);
@@ -1169,459 +1169,20 @@ WsvParser.invalidStringLineBreak = "Invalid string line break";
 WsvParser.invalidCharacterAfterString = "Invalid character after string";
 WsvParser.invalidDoubleQuoteInValue = "Invalid double quote in value";
 // ----------------------------------------------------------------------
-export class VarInt56Encoder {
-    static encode(i) {
-        if (i < 0 || !Number.isInteger(i)) {
-            throw new RangeError();
-        }
-        if (i < 2 ** 6) {
-            const codePoint1 = (i << 1) + 1;
-            return new Uint8Array([codePoint1]);
-        }
-        else if (i < 2 ** 12) {
-            const codePoint1 = ((i & 3968) >> 5) | 0b10;
-            const codePoint2 = i & 0b1111111;
-            return new Uint8Array([codePoint1, codePoint2]);
-        }
-        else if (i < 2 ** 18) {
-            const codePoint1 = ((i & 245760) >> 11) | 0b100;
-            const codePoint2 = (i & 16256) >> 7;
-            const codePoint3 = i & 0b1111111;
-            return new Uint8Array([codePoint1, codePoint2, codePoint3]);
-        }
-        else if (i < 2 ** 24) {
-            const codePoint1 = ((i & 14680064) >> 17) | 0b1000;
-            const codePoint2 = (i & 2080768) >> 14;
-            const codePoint3 = (i & 16256) >> 7;
-            const codePoint4 = i & 0b1111111;
-            return new Uint8Array([codePoint1, codePoint2, codePoint3, codePoint4]);
-        }
-        else if (i < 2 ** 30) {
-            const codePoint1 = ((i & 805306368) >> 23) | 0b10000;
-            const codePoint2 = (i & 266338304) >> 21;
-            const codePoint3 = (i & 2080768) >> 14;
-            const codePoint4 = (i & 16256) >> 7;
-            const codePoint5 = i & 0b1111111;
-            return new Uint8Array([codePoint1, codePoint2, codePoint3, codePoint4, codePoint5]);
-        }
-        else if (i < 2 ** 36) {
-            const bI = BigInt(i);
-            const codePoint1 = ((bI & 34359738368n) >> 29n) | 32n;
-            const codePoint2 = (bI & 34091302912n) >> 28n;
-            const codePoint3 = (i & 266338304) >> 21;
-            const codePoint4 = (i & 2080768) >> 14;
-            const codePoint5 = (i & 16256) >> 7;
-            const codePoint6 = i & 0b1111111;
-            return new Uint8Array([Number(codePoint1), Number(codePoint2), codePoint3, codePoint4, codePoint5, codePoint6]);
-        }
-        else if (i < 2 ** 42) {
-            const bI = BigInt(i);
-            const codePoint2 = (bI & 4363686772736n) >> 35n;
-            const codePoint3 = (bI & 34091302912n) >> 28n;
-            const codePoint4 = (i & 266338304) >> 21;
-            const codePoint5 = (i & 2080768) >> 14;
-            const codePoint6 = (i & 16256) >> 7;
-            const codePoint7 = i & 0b1111111;
-            return new Uint8Array([0b1000000, Number(codePoint2), Number(codePoint3), codePoint4, codePoint5, codePoint6, codePoint7]);
-        }
-        else if (i <= Number.MAX_SAFE_INTEGER) {
-            const bI = BigInt(i);
-            const codePoint2 = (bI & 71494644084506624n) >> 49n;
-            const codePoint3 = (bI & 558551906910208n) >> 42n;
-            const codePoint4 = (bI & 4363686772736n) >> 35n;
-            const codePoint5 = (bI & 34091302912n) >> 28n;
-            const codePoint6 = (i & 266338304) >> 21;
-            const codePoint7 = (i & 2080768) >> 14;
-            const codePoint8 = (i & 16256) >> 7;
-            const codePoint9 = i & 0b1111111;
-            return new Uint8Array([0, Number(codePoint2), Number(codePoint3), Number(codePoint4), Number(codePoint5), codePoint6, codePoint7, codePoint8, codePoint9]);
-        }
-        else {
-            throw new Error("Not supported");
-        }
-    }
-    static encodeIntoBuffer(i, buffer, offset) {
-        if (i < 0 || !Number.isInteger(i)) {
-            throw new RangeError();
-        }
-        if (i < 2 ** 6) {
-            if (offset >= buffer.length) {
-                throw new RangeError();
-            }
-            buffer[offset] = (i << 1) + 1;
-            return 1;
-        }
-        else if (i < 2 ** 12) {
-            if (offset + 1 >= buffer.length) {
-                throw new RangeError();
-            }
-            buffer[offset] = ((i & 3968) >> 5) | 0b10;
-            buffer[offset + 1] = i & 0b1111111;
-            return 2;
-        }
-        else if (i < 2 ** 18) {
-            if (offset + 2 >= buffer.length) {
-                throw new RangeError();
-            }
-            buffer[offset] = ((i & 245760) >> 11) | 0b100;
-            buffer[offset + 1] = (i & 16256) >> 7;
-            buffer[offset + 2] = i & 0b1111111;
-            return 3;
-        }
-        else if (i < 2 ** 24) {
-            if (offset + 3 >= buffer.length) {
-                throw new RangeError();
-            }
-            buffer[offset] = ((i & 14680064) >> 17) | 0b1000;
-            buffer[offset + 1] = (i & 2080768) >> 14;
-            buffer[offset + 2] = (i & 16256) >> 7;
-            buffer[offset + 3] = i & 0b1111111;
-            return 4;
-        }
-        else if (i < 2 ** 30) {
-            if (offset + 4 >= buffer.length) {
-                throw new RangeError();
-            }
-            buffer[offset] = ((i & 805306368) >> 23) | 0b10000;
-            buffer[offset + 1] = (i & 266338304) >> 21;
-            buffer[offset + 2] = (i & 2080768) >> 14;
-            buffer[offset + 3] = (i & 16256) >> 7;
-            buffer[offset + 4] = i & 0b1111111;
-            return 5;
-        }
-        else if (i < 2 ** 36) {
-            if (offset + 5 >= buffer.length) {
-                throw new RangeError();
-            }
-            const bI = BigInt(i);
-            buffer[offset] = Number(((bI & 34359738368n) >> 29n) | 32n);
-            buffer[offset + 1] = Number((bI & 34091302912n) >> 28n);
-            buffer[offset + 2] = (i & 266338304) >> 21;
-            buffer[offset + 3] = (i & 2080768) >> 14;
-            buffer[offset + 4] = (i & 16256) >> 7;
-            buffer[offset + 5] = i & 0b1111111;
-            return 6;
-        }
-        else if (i < 2 ** 42) {
-            if (offset + 6 >= buffer.length) {
-                throw new RangeError();
-            }
-            const bI = BigInt(i);
-            buffer[offset] = 0b1000000;
-            buffer[offset + 1] = Number((bI & 4363686772736n) >> 35n);
-            buffer[offset + 2] = Number((bI & 34091302912n) >> 28n);
-            buffer[offset + 3] = (i & 266338304) >> 21;
-            buffer[offset + 4] = (i & 2080768) >> 14;
-            buffer[offset + 5] = (i & 16256) >> 7;
-            buffer[offset + 6] = i & 0b1111111;
-            return 7;
-        }
-        else if (i <= Number.MAX_SAFE_INTEGER) {
-            if (offset + 8 >= buffer.length) {
-                throw new RangeError();
-            }
-            const bI = BigInt(i);
-            buffer[offset] = 0;
-            buffer[offset + 1] = Number((bI & 71494644084506624n) >> 49n);
-            buffer[offset + 2] = Number((bI & 558551906910208n) >> 42n);
-            buffer[offset + 3] = Number((bI & 4363686772736n) >> 35n);
-            buffer[offset + 4] = Number((bI & 34091302912n) >> 28n);
-            buffer[offset + 5] = (i & 266338304) >> 21;
-            buffer[offset + 6] = (i & 2080768) >> 14;
-            buffer[offset + 7] = (i & 16256) >> 7;
-            buffer[offset + 8] = i & 0b1111111;
-            return 9;
-        }
-        else {
-            throw new Error("Not supported");
-        }
-    }
-    static encodeAsString(i) {
-        if (i < 0 || !Number.isInteger(i)) {
-            throw new RangeError();
-        }
-        if (i < 2 ** 6) {
-            return String.fromCodePoint((i << 1) + 1);
-        }
-        else if (i < 2 ** 12) {
-            const codePoint1 = ((i & 3968) >> 5) | 0b10;
-            const codePoint2 = i & 0b1111111;
-            return String.fromCodePoint(codePoint1, codePoint2);
-        }
-        else if (i < 2 ** 18) {
-            const codePoint1 = ((i & 245760) >> 11) | 0b100;
-            const codePoint2 = (i & 16256) >> 7;
-            const codePoint3 = i & 0b1111111;
-            return String.fromCodePoint(codePoint1, codePoint2, codePoint3);
-        }
-        else if (i < 2 ** 24) {
-            const codePoint1 = ((i & 14680064) >> 17) | 0b1000;
-            const codePoint2 = (i & 2080768) >> 14;
-            const codePoint3 = (i & 16256) >> 7;
-            const codePoint4 = i & 0b1111111;
-            return String.fromCodePoint(codePoint1, codePoint2, codePoint3, codePoint4);
-        }
-        else if (i < 2 ** 30) {
-            const codePoint1 = ((i & 805306368) >> 23) | 0b10000;
-            const codePoint2 = (i & 266338304) >> 21;
-            const codePoint3 = (i & 2080768) >> 14;
-            const codePoint4 = (i & 16256) >> 7;
-            const codePoint5 = i & 0b1111111;
-            return String.fromCodePoint(codePoint1, codePoint2, codePoint3, codePoint4, codePoint5);
-        }
-        else if (i < 2 ** 36) {
-            const bI = BigInt(i);
-            const codePoint1 = ((bI & 34359738368n) >> 29n) | 32n;
-            const codePoint2 = (bI & 34091302912n) >> 28n;
-            const codePoint3 = (i & 266338304) >> 21;
-            const codePoint4 = (i & 2080768) >> 14;
-            const codePoint5 = (i & 16256) >> 7;
-            const codePoint6 = i & 0b1111111;
-            return String.fromCodePoint(Number(codePoint1), Number(codePoint2), codePoint3, codePoint4, codePoint5, codePoint6);
-        }
-        else if (i < 2 ** 42) {
-            const bI = BigInt(i);
-            const codePoint2 = (bI & 4363686772736n) >> 35n;
-            const codePoint3 = (bI & 34091302912n) >> 28n;
-            const codePoint4 = (i & 266338304) >> 21;
-            const codePoint5 = (i & 2080768) >> 14;
-            const codePoint6 = (i & 16256) >> 7;
-            const codePoint7 = i & 0b1111111;
-            return String.fromCodePoint(0b1000000, Number(codePoint2), Number(codePoint3), codePoint4, codePoint5, codePoint6, codePoint7);
-        }
-        else if (i <= Number.MAX_SAFE_INTEGER) {
-            const bI = BigInt(i);
-            const codePoint2 = (bI & 71494644084506624n) >> 49n;
-            const codePoint3 = (bI & 558551906910208n) >> 42n;
-            const codePoint4 = (bI & 4363686772736n) >> 35n;
-            const codePoint5 = (bI & 34091302912n) >> 28n;
-            const codePoint6 = (i & 266338304) >> 21;
-            const codePoint7 = (i & 2080768) >> 14;
-            const codePoint8 = (i & 16256) >> 7;
-            const codePoint9 = i & 0b1111111;
-            return String.fromCodePoint(0, Number(codePoint2), Number(codePoint3), Number(codePoint4), Number(codePoint5), codePoint6, codePoint7, codePoint8, codePoint9);
-        }
-        else {
-            throw new Error("Not supported");
-        }
-    }
-}
-// ----------------------------------------------------------------------
-export class InvalidVarInt56Error extends Error {
-    constructor() {
-        super("Invalid VarInt56");
-    }
-}
-// ----------------------------------------------------------------------
-export class VarInt56Decoder {
-    static decode(bytes, offset = 0) {
-        if (offset >= bytes.length || offset < 0) {
-            throw new Error(`Offset is out of range`);
-        }
-        const firstByte = bytes[offset];
-        if ((firstByte & 0b10000000) === 0b10000000) {
-            throw new InvalidVarInt56Error();
-        }
-        if ((firstByte & 0b00000001) === 0b00000001) {
-            const value = (firstByte >> 1);
-            return [value, 1];
-        }
-        else if ((firstByte & 0b00000010) === 0b00000010) {
-            if (offset + 1 >= bytes.length) {
-                throw new InvalidVarInt56Error();
-            }
-            const secondByte = bytes[offset + 1];
-            if ((secondByte & 0b10000000) === 0b10000000) {
-                throw new InvalidVarInt56Error();
-            }
-            const value = (((firstByte & 0b1111100) << 5) |
-                secondByte);
-            return [value, 2];
-        }
-        else if ((firstByte & 0b00000100) === 0b00000100) {
-            if (offset + 2 >= bytes.length) {
-                throw new InvalidVarInt56Error();
-            }
-            const secondByte = bytes[offset + 1];
-            const thirdByte = bytes[offset + 2];
-            if ((secondByte & 0b10000000) === 0b10000000 ||
-                (thirdByte & 0b10000000) === 0b10000000) {
-                throw new InvalidVarInt56Error();
-            }
-            const value = (((firstByte & 0b1111000) << 11) |
-                (secondByte << 7) |
-                thirdByte);
-            return [value, 3];
-        }
-        else if ((firstByte & 0b00001000) === 0b00001000) {
-            if (offset + 3 >= bytes.length) {
-                throw new InvalidVarInt56Error();
-            }
-            const secondByte = bytes[offset + 1];
-            const thirdByte = bytes[offset + 2];
-            const fourthByte = bytes[offset + 3];
-            if ((secondByte & 0b10000000) === 0b10000000 ||
-                (thirdByte & 0b10000000) === 0b10000000 ||
-                (fourthByte & 0b10000000) === 0b10000000) {
-                throw new InvalidVarInt56Error();
-            }
-            const value = (((firstByte & 0b1110000) << 17) |
-                (secondByte << 14) |
-                (thirdByte << 7) |
-                fourthByte);
-            return [value, 4];
-        }
-        else if ((firstByte & 0b00010000) === 0b00010000) {
-            if (offset + 4 >= bytes.length) {
-                throw new InvalidVarInt56Error();
-            }
-            const secondByte = bytes[offset + 1];
-            const thirdByte = bytes[offset + 2];
-            const fourthByte = bytes[offset + 3];
-            const fifthByte = bytes[offset + 4];
-            if ((secondByte & 0b10000000) === 0b10000000 ||
-                (thirdByte & 0b10000000) === 0b10000000 ||
-                (fourthByte & 0b10000000) === 0b10000000 ||
-                (fifthByte & 0b10000000) === 0b10000000) {
-                throw new InvalidVarInt56Error();
-            }
-            const value = (((firstByte & 0b1100000) << 23) |
-                (secondByte << 21) |
-                (thirdByte << 14) |
-                (fourthByte << 7) |
-                fifthByte);
-            return [value, 5];
-        }
-        else if ((firstByte & 0b00100000) === 0b00100000) {
-            if (offset + 5 >= bytes.length) {
-                throw new InvalidVarInt56Error();
-            }
-            const secondByte = bytes[offset + 1];
-            const thirdByte = bytes[offset + 2];
-            const fourthByte = bytes[offset + 3];
-            const fifthByte = bytes[offset + 4];
-            const sixthByte = bytes[offset + 5];
-            if ((secondByte & 0b10000000) === 0b10000000 ||
-                (thirdByte & 0b10000000) === 0b10000000 ||
-                (fourthByte & 0b10000000) === 0b10000000 ||
-                (fifthByte & 0b10000000) === 0b10000000 ||
-                (sixthByte & 0b10000000) === 0b10000000) {
-                throw new InvalidVarInt56Error();
-            }
-            const value = (((BigInt(firstByte) & 64n) << 29n) |
-                (BigInt(secondByte) << 28n) |
-                (BigInt(thirdByte) << 21n) |
-                (BigInt(fourthByte) << 14n) |
-                (BigInt(fifthByte) << 7n) |
-                BigInt(sixthByte));
-            return [Number(value), 6];
-        }
-        else if ((firstByte & 0b01000000) === 0b01000000) {
-            if (offset + 6 >= bytes.length) {
-                throw new InvalidVarInt56Error();
-            }
-            const secondByte = bytes[offset + 1];
-            const thirdByte = bytes[offset + 2];
-            const fourthByte = bytes[offset + 3];
-            const fifthByte = bytes[offset + 4];
-            const sixthByte = bytes[offset + 5];
-            const seventhByte = bytes[offset + 6];
-            if ((secondByte & 0b10000000) === 0b10000000 ||
-                (thirdByte & 0b10000000) === 0b10000000 ||
-                (fourthByte & 0b10000000) === 0b10000000 ||
-                (fifthByte & 0b10000000) === 0b10000000 ||
-                (sixthByte & 0b10000000) === 0b10000000 ||
-                (seventhByte & 0b10000000) === 0b10000000) {
-                throw new InvalidVarInt56Error();
-            }
-            const value = ((BigInt(secondByte) << 35n) |
-                (BigInt(thirdByte) << 28n) |
-                (BigInt(fourthByte) << 21n) |
-                (BigInt(fifthByte) << 14n) |
-                (BigInt(sixthByte) << 7n) |
-                BigInt(seventhByte));
-            return [Number(value), 7];
-        }
-        else {
-            if (offset + 8 >= bytes.length) {
-                throw new InvalidVarInt56Error();
-            }
-            const secondByte = bytes[offset + 1];
-            const thirdByte = bytes[offset + 2];
-            const fourthByte = bytes[offset + 3];
-            const fifthByte = bytes[offset + 4];
-            const sixthByte = bytes[offset + 5];
-            const seventhByte = bytes[offset + 6];
-            const eigthByte = bytes[offset + 7];
-            const ninthByte = bytes[offset + 8];
-            if ((secondByte & 0b10000000) === 0b10000000 ||
-                (thirdByte & 0b10000000) === 0b10000000 ||
-                (fourthByte & 0b10000000) === 0b10000000 ||
-                (fifthByte & 0b10000000) === 0b10000000 ||
-                (sixthByte & 0b10000000) === 0b10000000 ||
-                (seventhByte & 0b10000000) === 0b10000000 ||
-                (eigthByte & 0b10000000) === 0b10000000 ||
-                (ninthByte & 0b10000000) === 0b10000000) {
-                throw new InvalidVarInt56Error();
-            }
-            const value = ((BigInt(secondByte) << 49n) |
-                (BigInt(thirdByte) << 42n) |
-                (BigInt(fourthByte) << 35n) |
-                (BigInt(fifthByte) << 28n) |
-                (BigInt(sixthByte) << 21n) |
-                (BigInt(seventhByte) << 14n) |
-                (BigInt(eigthByte) << 7n) |
-                BigInt(ninthByte));
-            if (value > Number.MAX_SAFE_INTEGER) {
-                throw new Error("Not supported");
-            }
-            return [Number(value), 9];
-        }
-    }
-    static getLengthFromFirstByte(bytes, offset = 0) {
-        if (offset >= bytes.length || offset < 0) {
-            throw new Error(`Offset is out of range`);
-        }
-        const firstByte = bytes[offset];
-        if ((firstByte & 0b10000000) === 0b10000000) {
-            throw new InvalidVarInt56Error();
-        }
-        if ((firstByte & 0b00000001) === 0b00000001) {
-            return 1;
-        }
-        else if ((firstByte & 0b00000010) === 0b00000010) {
-            return 2;
-        }
-        else if ((firstByte & 0b00000100) === 0b00000100) {
-            return 3;
-        }
-        else if ((firstByte & 0b00001000) === 0b00001000) {
-            return 4;
-        }
-        else if ((firstByte & 0b00010000) === 0b00010000) {
-            return 5;
-        }
-        else if ((firstByte & 0b00100000) === 0b00100000) {
-            return 6;
-        }
-        else if ((firstByte & 0b01000000) === 0b01000000) {
-            return 7;
-        }
-        else {
-            return 9;
-        }
-    }
-}
-// ----------------------------------------------------------------------
 export class BinaryWsvUtil {
     static getPreambleVersion1() {
-        return new Uint8Array([0x42, 0x57, 0x53, 0x56, 0x31]);
+        return new Uint8Array([0x42, 0x57, 0x31]);
     }
 }
+BinaryWsvUtil.lineBreakByte = 0b11111111;
+BinaryWsvUtil.valueSeparatorByte = 0b11111110;
+BinaryWsvUtil.nullValueByte = 0b11111101;
+BinaryWsvUtil.emptyStringByte = 0b11111100;
 // ----------------------------------------------------------------------
 export class Uint8ArrayBuilder {
     constructor(initialSize = 4096) {
         this._numBytes = 0;
+        this._utf8Encoder = new TextEncoder();
         this._buffer = new Uint8Array(initialSize);
     }
     prepare(appendLength) {
@@ -1635,86 +1196,91 @@ export class Uint8ArrayBuilder {
             this._buffer = newBuffer;
         }
     }
+    reset() {
+        this._numBytes = 0;
+    }
     push(part) {
         this.prepare(part.length);
         this._buffer.set(part, this._numBytes);
         this._numBytes += part.length;
+    }
+    pushUtf8String(str) {
+        Utf16String.validate(str);
+        const bytes = this._utf8Encoder.encode(str);
+        this.push(bytes);
     }
     pushByte(byte) {
         this.prepare(1);
         this._buffer[this._numBytes] = byte;
         this._numBytes++;
     }
-    pushVarInt56(value) {
-        this.prepare(9);
-        this._numBytes += VarInt56Encoder.encodeIntoBuffer(value, this._buffer, this._numBytes);
-    }
-    getArray() {
+    toArray() {
         return this._buffer.subarray(0, this._numBytes);
     }
 }
 // ----------------------------------------------------------------------
 export class BinaryWsvEncoder {
-    static _encodeValues(values, builder) {
-        for (const value of values) {
+    static internalEncodeValues(values, builder) {
+        for (let i = 0; i < values.length; i++) {
+            if (i !== 0) {
+                builder.pushByte(BinaryWsvUtil.valueSeparatorByte);
+            }
+            const value = values[i];
             if (value === null) {
-                builder.pushByte(this._nullValueByte);
+                builder.pushByte(BinaryWsvUtil.nullValueByte);
+            }
+            else if (value.length === 0) {
+                builder.pushByte(BinaryWsvUtil.emptyStringByte);
             }
             else {
-                const valueEncoded = Utf16String.toUtf8Bytes(value);
-                builder.pushVarInt56(valueEncoded.length + 2);
-                builder.push(valueEncoded);
+                builder.pushUtf8String(value);
             }
+        }
+    }
+    static internalEncodeJaggedArray(jaggedArray, builder) {
+        let wasFirst = true;
+        for (const line of jaggedArray) {
+            if (wasFirst === false) {
+                builder.pushByte(BinaryWsvUtil.lineBreakByte);
+            }
+            wasFirst = false;
+            this.internalEncodeValues(line, builder);
+        }
+    }
+    static internalEncode(document, builder) {
+        let wasFirst = true;
+        for (const line of document.lines) {
+            if (wasFirst === false) {
+                builder.pushByte(BinaryWsvUtil.lineBreakByte);
+            }
+            wasFirst = false;
+            this.internalEncodeValues(line.values, builder);
         }
     }
     static encodeValues(values) {
         const builder = new Uint8ArrayBuilder();
-        this._encodeValues(values, builder);
-        return builder.getArray();
+        this.internalEncodeValues(values, builder);
+        return builder.toArray();
     }
     static encodeJaggedArray(jaggedArray, withPreamble = true) {
-        const preamble = BinaryWsvUtil.getPreambleVersion1();
-        if (jaggedArray.length === 0 ||
-            (jaggedArray.length === 1 && jaggedArray[0].length === 0)) {
-            return withPreamble ? preamble : new Uint8Array();
-        }
         const builder = new Uint8ArrayBuilder();
         if (withPreamble === true) {
+            const preamble = BinaryWsvUtil.getPreambleVersion1();
             builder.push(preamble);
         }
-        let wasFirst = true;
-        for (const line of jaggedArray) {
-            if (wasFirst === false) {
-                builder.pushByte(this._lineBreakByte);
-            }
-            wasFirst = false;
-            this._encodeValues(line, builder);
-        }
-        return builder.getArray();
+        this.internalEncodeJaggedArray(jaggedArray, builder);
+        return builder.toArray();
     }
     static encode(document, withPreamble = true) {
-        const preamble = BinaryWsvUtil.getPreambleVersion1();
-        if (document.lines.length === 0 ||
-            (document.lines.length === 1 && document.lines[0].values.length === 0)) {
-            return withPreamble ? preamble : new Uint8Array();
-        }
         const builder = new Uint8ArrayBuilder();
         if (withPreamble === true) {
+            const preamble = BinaryWsvUtil.getPreambleVersion1();
             builder.push(preamble);
         }
-        let wasFirst = true;
-        for (const line of document.lines) {
-            if (wasFirst === false) {
-                builder.pushByte(this._lineBreakByte);
-            }
-            wasFirst = false;
-            this._encodeValues(line.values, builder);
-        }
-        return builder.getArray();
+        this.internalEncode(document, builder);
+        return builder.toArray();
     }
 }
-BinaryWsvEncoder._lineBreakByte = 0b00000001;
-BinaryWsvEncoder._nullValueByte = 0b00000011;
 // ----------------------------------------------------------------------
 export class NoBinaryWsvPreambleError extends Error {
     constructor() {
@@ -1722,193 +1288,84 @@ export class NoBinaryWsvPreambleError extends Error {
     }
 }
 // ----------------------------------------------------------------------
+export class InvalidBinaryWsvError extends Error {
+    constructor() {
+        super("Document is not a valid BinaryWSV document");
+    }
+}
+// ----------------------------------------------------------------------
 export class Uint8ArrayReader {
     constructor(buffer, offset) {
         this.buffer = buffer;
         this.offset = offset;
+        this.utf8Decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
     }
-    get hasBytes() {
-        return this.offset < this.buffer.length;
+    reset(buffer, offset) {
+        this.buffer = buffer;
+        this.offset = offset;
     }
-    readString(numBytes) {
-        if (this.offset + numBytes > this.buffer.length) {
-            throw new Error(`Can not fully read string`);
+    readNonEmptyUtf8String(values) {
+        const startOffset = this.offset;
+        this.offset++;
+        let wasLineBreak = false;
+        let wasSeparator = false;
+        while (this.offset < this.buffer.length) {
+            const currentByte = this.buffer[this.offset];
+            if (currentByte === BinaryWsvUtil.lineBreakByte) {
+                wasLineBreak = true;
+                wasSeparator = true;
+                break;
+            }
+            else if (currentByte === BinaryWsvUtil.valueSeparatorByte) {
+                wasSeparator = true;
+                break;
+            }
+            this.offset++;
         }
-        const valueBytes = this.buffer.subarray(this.offset, this.offset + numBytes);
-        this.offset += numBytes;
-        return Utf16String.fromUtf8Bytes(valueBytes);
+        const bytes = this.buffer.subarray(startOffset, this.offset);
+        try {
+            const value = this.utf8Decoder.decode(bytes);
+            values.push(value);
+        }
+        catch (error) {
+            throw new InvalidBinaryWsvError();
+        }
+        if (wasSeparator === true) {
+            this.offset++;
+        }
+        return wasLineBreak;
     }
-    readVarInt56() {
-        if (this.offset >= this.buffer.length || this.offset < 0) {
-            throw new Error(`Offset is out of range`);
+    read(values) {
+        if (this.offset >= this.buffer.length) {
+            return undefined;
         }
-        const firstByte = this.buffer[this.offset];
-        if ((firstByte & 0b10000000) === 0b10000000) {
-            throw new InvalidVarInt56Error();
+        const peekByte = this.buffer[this.offset];
+        if (peekByte === BinaryWsvUtil.lineBreakByte) {
+            this.offset++;
+            return true;
         }
-        if ((firstByte & 0b00000001) === 0b00000001) {
-            const value = (firstByte >> 1);
-            this.offset += 1;
-            return value;
+        if (peekByte === BinaryWsvUtil.nullValueByte) {
+            values.push(null);
+            this.offset++;
         }
-        else if ((firstByte & 0b00000010) === 0b00000010) {
-            if (this.offset + 1 >= this.buffer.length) {
-                throw new InvalidVarInt56Error();
-            }
-            const secondByte = this.buffer[this.offset + 1];
-            if ((secondByte & 0b10000000) === 0b10000000) {
-                throw new InvalidVarInt56Error();
-            }
-            const value = (((firstByte & 0b1111100) << 5) |
-                secondByte);
-            this.offset += 2;
-            return value;
-        }
-        else if ((firstByte & 0b00000100) === 0b00000100) {
-            if (this.offset + 2 >= this.buffer.length) {
-                throw new InvalidVarInt56Error();
-            }
-            const secondByte = this.buffer[this.offset + 1];
-            const thirdByte = this.buffer[this.offset + 2];
-            if ((secondByte & 0b10000000) === 0b10000000 ||
-                (thirdByte & 0b10000000) === 0b10000000) {
-                throw new InvalidVarInt56Error();
-            }
-            const value = (((firstByte & 0b1111000) << 11) |
-                (secondByte << 7) |
-                thirdByte);
-            this.offset += 3;
-            return value;
-        }
-        else if ((firstByte & 0b00001000) === 0b00001000) {
-            if (this.offset + 3 >= this.buffer.length) {
-                throw new InvalidVarInt56Error();
-            }
-            const secondByte = this.buffer[this.offset + 1];
-            const thirdByte = this.buffer[this.offset + 2];
-            const fourthByte = this.buffer[this.offset + 3];
-            if ((secondByte & 0b10000000) === 0b10000000 ||
-                (thirdByte & 0b10000000) === 0b10000000 ||
-                (fourthByte & 0b10000000) === 0b10000000) {
-                throw new InvalidVarInt56Error();
-            }
-            const value = (((firstByte & 0b1110000) << 17) |
-                (secondByte << 14) |
-                (thirdByte << 7) |
-                fourthByte);
-            this.offset += 4;
-            return value;
-        }
-        else if ((firstByte & 0b00010000) === 0b00010000) {
-            if (this.offset + 4 >= this.buffer.length) {
-                throw new InvalidVarInt56Error();
-            }
-            const secondByte = this.buffer[this.offset + 1];
-            const thirdByte = this.buffer[this.offset + 2];
-            const fourthByte = this.buffer[this.offset + 3];
-            const fifthByte = this.buffer[this.offset + 4];
-            if ((secondByte & 0b10000000) === 0b10000000 ||
-                (thirdByte & 0b10000000) === 0b10000000 ||
-                (fourthByte & 0b10000000) === 0b10000000 ||
-                (fifthByte & 0b10000000) === 0b10000000) {
-                throw new InvalidVarInt56Error();
-            }
-            const value = (((firstByte & 0b1100000) << 23) |
-                (secondByte << 21) |
-                (thirdByte << 14) |
-                (fourthByte << 7) |
-                fifthByte);
-            this.offset += 5;
-            return value;
-        }
-        else if ((firstByte & 0b00100000) === 0b00100000) {
-            if (this.offset + 5 >= this.buffer.length) {
-                throw new InvalidVarInt56Error();
-            }
-            const secondByte = this.buffer[this.offset + 1];
-            const thirdByte = this.buffer[this.offset + 2];
-            const fourthByte = this.buffer[this.offset + 3];
-            const fifthByte = this.buffer[this.offset + 4];
-            const sixthByte = this.buffer[this.offset + 5];
-            if ((secondByte & 0b10000000) === 0b10000000 ||
-                (thirdByte & 0b10000000) === 0b10000000 ||
-                (fourthByte & 0b10000000) === 0b10000000 ||
-                (fifthByte & 0b10000000) === 0b10000000 ||
-                (sixthByte & 0b10000000) === 0b10000000) {
-                throw new InvalidVarInt56Error();
-            }
-            const value = (((BigInt(firstByte) & 64n) << 29n) |
-                (BigInt(secondByte) << 28n) |
-                (BigInt(thirdByte) << 21n) |
-                (BigInt(fourthByte) << 14n) |
-                (BigInt(fifthByte) << 7n) |
-                BigInt(sixthByte));
-            this.offset += 6;
-            return Number(value);
-        }
-        else if ((firstByte & 0b01000000) === 0b01000000) {
-            if (this.offset + 6 >= this.buffer.length) {
-                throw new InvalidVarInt56Error();
-            }
-            const secondByte = this.buffer[this.offset + 1];
-            const thirdByte = this.buffer[this.offset + 2];
-            const fourthByte = this.buffer[this.offset + 3];
-            const fifthByte = this.buffer[this.offset + 4];
-            const sixthByte = this.buffer[this.offset + 5];
-            const seventhByte = this.buffer[this.offset + 6];
-            if ((secondByte & 0b10000000) === 0b10000000 ||
-                (thirdByte & 0b10000000) === 0b10000000 ||
-                (fourthByte & 0b10000000) === 0b10000000 ||
-                (fifthByte & 0b10000000) === 0b10000000 ||
-                (sixthByte & 0b10000000) === 0b10000000 ||
-                (seventhByte & 0b10000000) === 0b10000000) {
-                throw new InvalidVarInt56Error();
-            }
-            const value = ((BigInt(secondByte) << 35n) |
-                (BigInt(thirdByte) << 28n) |
-                (BigInt(fourthByte) << 21n) |
-                (BigInt(fifthByte) << 14n) |
-                (BigInt(sixthByte) << 7n) |
-                BigInt(seventhByte));
-            this.offset += 7;
-            return Number(value);
+        else if (peekByte === BinaryWsvUtil.emptyStringByte) {
+            values.push("");
+            this.offset++;
         }
         else {
-            if (this.offset + 8 >= this.buffer.length) {
-                throw new InvalidVarInt56Error();
-            }
-            const secondByte = this.buffer[this.offset + 1];
-            const thirdByte = this.buffer[this.offset + 2];
-            const fourthByte = this.buffer[this.offset + 3];
-            const fifthByte = this.buffer[this.offset + 4];
-            const sixthByte = this.buffer[this.offset + 5];
-            const seventhByte = this.buffer[this.offset + 6];
-            const eigthByte = this.buffer[this.offset + 7];
-            const ninthByte = this.buffer[this.offset + 8];
-            if ((secondByte & 0b10000000) === 0b10000000 ||
-                (thirdByte & 0b10000000) === 0b10000000 ||
-                (fourthByte & 0b10000000) === 0b10000000 ||
-                (fifthByte & 0b10000000) === 0b10000000 ||
-                (sixthByte & 0b10000000) === 0b10000000 ||
-                (seventhByte & 0b10000000) === 0b10000000 ||
-                (eigthByte & 0b10000000) === 0b10000000 ||
-                (ninthByte & 0b10000000) === 0b10000000) {
-                throw new InvalidVarInt56Error();
-            }
-            const value = ((BigInt(secondByte) << 49n) |
-                (BigInt(thirdByte) << 42n) |
-                (BigInt(fourthByte) << 35n) |
-                (BigInt(fifthByte) << 28n) |
-                (BigInt(sixthByte) << 21n) |
-                (BigInt(seventhByte) << 14n) |
-                (BigInt(eigthByte) << 7n) |
-                BigInt(ninthByte));
-            if (value > Number.MAX_SAFE_INTEGER) {
-                throw new Error("Not supported");
-            }
-            this.offset += 9;
-            return Number(value);
+            return this.readNonEmptyUtf8String(values);
         }
+        if (this.offset < this.buffer.length) {
+            const peekFollowingByte = this.buffer[this.offset];
+            this.offset++;
+            if (peekFollowingByte === BinaryWsvUtil.lineBreakByte) {
+                return true;
+            }
+            else if (peekFollowingByte !== BinaryWsvUtil.valueSeparatorByte) {
+                throw new InvalidBinaryWsvError();
+            }
+        }
+        return false;
     }
 }
 // ----------------------------------------------------------------------
@@ -1921,32 +1378,25 @@ export class BinaryWsvDecoder {
         return version;
     }
     static getVersionOrNull(bytes) {
-        if (bytes.length < 5 ||
+        if (bytes.length < 3 ||
             bytes[0] !== 0x42 ||
-            bytes[1] !== 0x57 ||
-            bytes[2] !== 0x53 ||
-            bytes[3] !== 0x56) {
+            bytes[1] !== 0x57) {
             return null;
         }
-        return String.fromCharCode(bytes[4]);
+        return String.fromCharCode(bytes[2]);
     }
-    static decodeValue(reader, values) {
-        const varInt = reader.readVarInt56();
-        if (varInt === 0) {
-            return true;
+    static internalDecodeLineValues(reader) {
+        const currentLine = [];
+        for (;;) {
+            const wasLineBreak = reader.read(currentLine);
+            if (wasLineBreak === undefined) {
+                break;
+            }
+            if (wasLineBreak === true) {
+                throw new Error("Invalid line bytes");
+            }
         }
-        else if (varInt === 1) {
-            values.push(null);
-        }
-        else if (varInt === 2) {
-            values.push("");
-        }
-        else {
-            const valueLength = varInt - 2;
-            const strValue = reader.readString(valueLength);
-            values.push(strValue);
-        }
-        return false;
+        return currentLine;
     }
     static decodeAsJaggedArray(bytes, withPreamble = true) {
         if (withPreamble === true) {
@@ -1956,11 +1406,14 @@ export class BinaryWsvDecoder {
             }
         }
         const result = [];
-        const reader = new Uint8ArrayReader(bytes, withPreamble ? 5 : 0);
+        const reader = new Uint8ArrayReader(bytes, withPreamble ? 3 : 0);
         let currentLine = [];
-        while (reader.hasBytes) {
-            const wasLineBreak = this.decodeValue(reader, currentLine);
-            if (wasLineBreak) {
+        for (;;) {
+            const wasLineBreak = reader.read(currentLine);
+            if (wasLineBreak === undefined) {
+                break;
+            }
+            if (wasLineBreak === true) {
                 result.push(currentLine);
                 currentLine = [];
             }
@@ -1976,11 +1429,14 @@ export class BinaryWsvDecoder {
             }
         }
         const document = new WsvDocument();
-        const reader = new Uint8ArrayReader(bytes, withPreamble ? 5 : 0);
+        const reader = new Uint8ArrayReader(bytes, withPreamble ? 3 : 0);
         let currentLine = [];
-        while (reader.hasBytes) {
-            const wasLineBreak = this.decodeValue(reader, currentLine);
-            if (wasLineBreak) {
+        for (;;) {
+            const wasLineBreak = reader.read(currentLine);
+            if (wasLineBreak === undefined) {
+                break;
+            }
+            if (wasLineBreak === true) {
                 document.addLine(currentLine);
                 currentLine = [];
             }
