@@ -399,7 +399,7 @@ export class WsvSerializer {
     }
 }
 // ----------------------------------------------------------------------
-export class WsvParser {
+class WsvParser {
     static parseLine(str, preserveWhitespacesAndComments, lineIndexOffset = 0) {
         const lines = WsvParser.parseLines(str, preserveWhitespacesAndComments, lineIndexOffset);
         if (lines.length !== 1) {
@@ -1168,8 +1168,9 @@ WsvParser.stringNotClosed = "String not closed";
 WsvParser.invalidStringLineBreak = "Invalid string line break";
 WsvParser.invalidCharacterAfterString = "Invalid character after string";
 WsvParser.invalidDoubleQuoteInValue = "Invalid double quote in value";
+export { WsvParser };
 // ----------------------------------------------------------------------
-export class BinaryWsvUtil {
+class BinaryWsvUtil {
     static getPreambleVersion1() {
         return new Uint8Array([0x42, 0x57, 0x31]);
     }
@@ -1178,6 +1179,7 @@ BinaryWsvUtil.lineBreakByte = 0b11111111;
 BinaryWsvUtil.valueSeparatorByte = 0b11111110;
 BinaryWsvUtil.nullValueByte = 0b11111101;
 BinaryWsvUtil.emptyStringByte = 0b11111100;
+export { BinaryWsvUtil };
 // ----------------------------------------------------------------------
 export class Uint8ArrayBuilder {
     constructor(initialSize = 4096) {

@@ -1,5 +1,8 @@
 ﻿# Changelog
 
+## 1.0.0
+- Readme update
+
 ## 0.8.0
 - BinaryWSV switch
 - renamed WsvDocument.getBytes to toBytes

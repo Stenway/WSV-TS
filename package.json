@@ -1,6 +1,6 @@
 {
   "name": "@stenway/wsv",
-  "version": "0.8.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "Encode and decode WSV documents",
   "homepage": "https://www.whitespacesv.com",
@@ -46,6 +46,6 @@
     "typescript": "^5.0.4"
   },
   "dependencies": {
-    "@stenway/reliabletxt": "^0.8.0"
+    "@stenway/reliabletxt": "^1.0.0"
   }
 }
