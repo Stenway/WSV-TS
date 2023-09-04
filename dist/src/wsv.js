@@ -175,7 +175,7 @@ export class WsvDocument {
     }
     toBase64String(preserveWhitespacesAndComments = true) {
         const str = this.toString(preserveWhitespacesAndComments);
-        return Base64String.fromText(str, this.encoding);
+        return Base64String.encodeText(str, this.encoding);
     }
     toBinaryWsv() {
         return BinaryWsvEncoder.encode(this);
@@ -206,7 +206,7 @@ export class WsvDocument {
         return document;
     }
     static fromBase64String(base64Str) {
-        const bytes = Base64String.toBytes(base64Str);
+        const bytes = Base64String.decodeAsBytes(base64Str);
         return this.fromBytes(bytes);
     }
     static fromBinaryWsv(bytes) {

@@ -174,7 +174,7 @@ export class WsvDocument {
 
 	toBase64String(preserveWhitespacesAndComments: boolean = true): string {
 		const str: string = this.toString(preserveWhitespacesAndComments)
-		return Base64String.fromText(str, this.encoding)
+		return Base64String.encodeText(str, this.encoding)
 	}
 
 	toBinaryWsv(): Uint8Array {
@@ -212,7 +212,7 @@ export class WsvDocument {
 	}
 
 	static fromBase64String(base64Str: string): WsvDocument {
-		const bytes = Base64String.toBytes(base64Str)
+		const bytes = Base64String.decodeAsBytes(base64Str)
 		return this.fromBytes(bytes)
 	}
 	
